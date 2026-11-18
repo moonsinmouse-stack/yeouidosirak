@@ -2,7 +2,18 @@
 // k-skill bccard-eatpl-search 스킬의 공개 프록시를 여의도 도로명별로 호출해
 // 합치고, 서여의도/동여의도/더현대·IFC 로 나눠 화면에 필요한 값만 돌려준다.
 
+import proj4 from 'proj4';
+
 const PROXY = process.env.KSKILL_PROXY_BASE_URL || 'https://k-skill-proxy.nomadamas.org';
+
+// 잇플 좌표(TM128/KATEC) → 지도용 위경도(WGS84)
+const KATEC = '+proj=tmerc +lat_0=38 +lon_0=128 +k=0.9999 +x_0=400000 +y_0=600000 +ellps=bessel +units=m +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43 +no_defs';
+function toLatLng(x, y) {
+  const X = Number(x), Y = Number(y);
+  if (!Number.isFinite(X) || !Number.isFinite(Y) || X === 0 || Y === 0) return [null, null];
+  const [lng, lat] = proj4(KATEC, 'EPSG:4326', [X, Y]);
+  return [Math.round(lat * 1e6) / 1e6, Math.round(lng * 1e6) / 1e6];
+}
 
 // 프록시는 주소 텍스트 부분일치 + 매출 상위 최대 100건이라, 도로를 나눠 여러 번 묻는다.
 const ROADS = [
@@ -55,6 +66,7 @@ function normalize(i) {
   const s = hhmm(i.srtTime);
   const e = hhmm(i.endTime);
   const cat = i.merTpbuzNm || '';
+  const [lat, lng] = toLatLng(i.xaxsVal, i.yaxsVal);
   const customers = i.vistCstmrRnkList ? Object.keys(i.vistCstmrRnkList).sort().map((k) => i.vistCstmrRnkList[k]).filter(Boolean) : [];
   return {
     id: i.merUrl.split('/').pop(),
@@ -63,6 +75,8 @@ function normalize(i) {
     cat,
     kind: kindOf(cat),
     region: regionOf(i),
+    lat,
+    lng,
     nat: i.allSaleRnk,
     loc: i.ccgSaleRnk,
     url: i.merUrl,

@@ -180,13 +180,56 @@ a { color: var(--ink); }
 :focus-visible { outline: 3px solid #1F6FEB; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 
-/* 데스크톱: 왼쪽 목록 + 오른쪽 카드 */
+/* 지도 */
+.map-wrap {
+  position: relative; isolation: isolate; height: 260px; border-radius: 24px; overflow: hidden;
+  border: 2.5px solid var(--ink); box-shadow: 0 4px 0 var(--ink); background: var(--mint-soft);
+}
+.map { position: absolute; inset: 0; }
+.map-toggle {
+  position: absolute; right: 10px; bottom: 10px; z-index: 500; min-height: 40px; padding: 0 14px;
+  border-radius: 20px; border: 2px solid var(--ink); background: #fff; cursor: pointer;
+  font-family: 'Jua', sans-serif; font-size: 14px; color: var(--ink-deep);
+}
+.map-wrap.big { position: fixed; inset: 0; z-index: 25; height: auto; border-radius: 0; border: 0; box-shadow: none; }
+.map-wrap.big .map-toggle { bottom: calc(18px + env(safe-area-inset-bottom)); right: 16px; min-height: 48px; font-size: 16px; }
+.leaflet-container { font-family: 'Gowun Dodum', sans-serif; background: #EDE6D6; }
+.pin-wrap { background: none; border: 0; }
+.pin {
+  display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin: 0 auto;
+  border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); background: var(--yellow);
+  border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink);
+  font-family: 'Jua', sans-serif; font-size: 14px; color: var(--ink-deep);
+}
+.pin i { font-style: normal; line-height: 1; transform: rotate(45deg); }
+.pin.sel { background: var(--coral); width: 36px; height: 36px; font-size: 16px; }
+.dot { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--coral); border: 2px solid var(--ink); }
+.leaflet-tooltip { font-family: 'Jua', sans-serif; font-size: 13px; color: var(--ink-deep); border: 2px solid var(--ink); border-radius: 10px; box-shadow: none; }
+
+/* 제비뽑기 조건 */
+.pick-filters { display: flex; flex-direction: column; gap: 6px; background: #FFF8E7; border: 2px solid var(--ink); border-radius: 22px; padding: 12px; }
+.pick-filters .f-label { margin-top: 2px; }
+.regions.small .region { min-height: 48px; border-radius: 14px; }
+.regions.small .region b { font-size: 14px; }
+.chips.small .chip { min-height: 40px; padding: 0 12px; font-size: 13px; }
+.pick-stage { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pick-stage .cup { width: 150px; height: 168px; }
+.pick-scope { margin: 0; text-align: center; font-size: 14px; color: var(--ink-deep); }
+.pick-scope b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 18px; color: var(--red-num); }
+.pick-title { font-size: 24px; }
+.btn-draw:disabled { opacity: .5; cursor: not-allowed; }
+
+/* 데스크톱: 왼쪽 목록 + 오른쪽 큰 지도, 카드는 지도 위에 */
 @media (min-width: 900px) {
-  .layout { max-width: 1040px; display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 32px; padding: 0 24px; }
-  .home { padding-top: 32px; }
-  .pane, .pane[hidden] {
-    display: block; position: sticky; top: 24px; inset: auto; height: calc(100vh - 48px);
-    margin-top: 24px; border-radius: 32px; border: 2.5px solid var(--ink); padding: 20px 24px;
+  .layout { max-width: none; margin: 0; }
+  .home { width: 480px; padding: 28px 24px 40px; }
+  .map-wrap, .map-wrap.big {
+    position: fixed; top: 0; right: 0; bottom: 0; left: 480px; height: auto; z-index: 1;
+    border-radius: 0; border: 0; border-left: 2.5px solid var(--ink); box-shadow: none;
   }
-  .pane .btn-back { visibility: hidden; }
+  .map-toggle { display: none; }
+  .pane {
+    position: fixed; inset: auto; top: 20px; right: 20px; bottom: 20px; width: 400px; z-index: 30;
+    border-radius: 30px; border: 2.5px solid var(--ink); box-shadow: 0 6px 0 var(--ink); padding: 18px 20px;
+  }
 }

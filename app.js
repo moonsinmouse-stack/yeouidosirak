@@ -20,8 +20,15 @@
     { id: 'foreign', label: '외국인 많은' },
     { id: 'local', label: '동네 사람 맛집' }
   ];
+  const TOPS = [
+    { id: 10, label: '상위 10곳' },
+    { id: 30, label: '상위 30곳' },
+    { id: 0, label: '조건에 맞는 전부' }
+  ];
   const REGION_NAME = { seo: '서여의도', center: '더현대·IFC', dong: '동여의도' };
   const PAGE = 20;
+  const MAP_MAX = 150;
+  const YEOUIDO = [37.5238, 126.9265];
 
   const state = {
     places: [],
@@ -30,12 +37,14 @@
     region: 'all',
     kind: 'meal',
     moods: new Set(['lunch']),
+    top: 30,
     shown: PAGE,
     selected: null,
     lastPick: null
   };
 
   const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
   const el = (tag, attrs = {}, ...kids) => {
     const n = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
@@ -47,21 +56,21 @@
     for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) n.append(kid);
     return n;
   };
+  const NS = 'http://www.w3.org/2000/svg';
   const svgUse = (cls) => {
-    const ns = 'http://www.w3.org/2000/svg';
-    const s = document.createElementNS(ns, 'svg');
+    const s = document.createElementNS(NS, 'svg');
     s.setAttribute('viewBox', '0 0 64 64'); s.setAttribute('class', cls); s.setAttribute('aria-hidden', 'true');
-    const u = document.createElementNS(ns, 'use'); u.setAttribute('href', '#dori'); s.append(u);
+    const u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#dori'); s.append(u);
     return s;
   };
   const icon = (d) => {
-    const ns = 'http://www.w3.org/2000/svg';
-    const s = document.createElementNS(ns, 'svg');
+    const s = document.createElementNS(NS, 'svg');
     s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true');
-    const p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); s.append(p);
+    const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d); s.append(p);
     return s;
   };
   const pct = (v) => (v === null || v === undefined ? '–' : `${v}%`);
+  const regionLabel = () => REGIONS.find((r) => r.id === state.region).label;
 
   function filtered() {
     return state.places.filter((p) => {
@@ -81,29 +90,36 @@
     return t;
   }
 
-  // ---------- 필터 ----------
+  // ---------- 조건 버튼 (홈·제비뽑기 화면이 같은 조건을 공유) ----------
+  function changed() { state.shown = PAGE; update(); }
+
   function renderFilters() {
-    const regions = $('#regions'); regions.replaceChildren();
-    for (const r of REGIONS) {
-      regions.append(el('button', {
+    for (const box of $$('[data-group="region"]')) {
+      box.replaceChildren(...REGIONS.map((r) => el('button', {
         class: 'region', type: 'button', 'aria-pressed': String(state.region === r.id),
-        onclick: () => { state.region = r.id; state.shown = PAGE; update(); }
-      }, el('b', {}, r.label), el('small', {}, r.sub)));
+        onclick: () => { state.region = r.id; changed(); }
+      }, el('b', {}, r.label), el('small', {}, r.sub))));
     }
-    const kinds = $('#kinds'); kinds.replaceChildren();
-    for (const k of KINDS) {
-      kinds.append(el('button', {
+    for (const box of $$('[data-group="kind"]')) {
+      box.replaceChildren(...KINDS.map((k) => el('button', {
         class: 'chip', type: 'button', 'aria-pressed': String(state.kind === k.id),
-        onclick: () => { state.kind = k.id; state.shown = PAGE; update(); }
-      }, k.label));
+        onclick: () => { state.kind = k.id; changed(); }
+      }, k.label)));
     }
-    const moods = $('#moods'); moods.replaceChildren();
-    for (const m of MOODS) {
-      const on = state.moods.has(m.id);
-      moods.append(el('button', {
-        class: 'chip', type: 'button', 'aria-pressed': String(on),
-        onclick: () => { on ? state.moods.delete(m.id) : state.moods.add(m.id); state.shown = PAGE; update(); }
-      }, m.label));
+    for (const box of $$('[data-group="mood"]')) {
+      box.replaceChildren(...MOODS.map((m) => {
+        const on = state.moods.has(m.id);
+        return el('button', {
+          class: 'chip', type: 'button', 'aria-pressed': String(on),
+          onclick: () => { on ? state.moods.delete(m.id) : state.moods.add(m.id); changed(); }
+        }, m.label);
+      }));
+    }
+    for (const box of $$('[data-group="top"]')) {
+      box.replaceChildren(...TOPS.map((t) => el('button', {
+        class: 'chip', type: 'button', 'aria-pressed': String(state.top === t.id),
+        onclick: () => { state.top = t.id; changed(); }
+      }, t.label)));
     }
   }
 
@@ -111,7 +127,6 @@
   function renderList() {
     const list = $('#list'); list.replaceChildren();
     const more = $('#more');
-    const regionLabel = REGIONS.find((r) => r.id === state.region).label;
     if (!state.loaded) {
       $('#result-title').textContent = '불러오는 중…';
       for (let i = 0; i < 4; i++) list.append(el('li', { class: 'skeleton', 'aria-hidden': 'true' }));
@@ -123,7 +138,7 @@
       more.hidden = true; return;
     }
     const items = filtered();
-    $('#result-title').textContent = `${regionLabel} ${items.length}곳`;
+    $('#result-title').textContent = `${regionLabel()} ${items.length}곳`;
     if (!items.length) {
       list.append(el('li', { class: 'empty' }, '이 조건에 맞는 집이 없어요. 조건을 하나 빼 보세요.'));
       more.hidden = true; return;
@@ -142,13 +157,90 @@
     more.hidden = items.length <= state.shown;
   }
 
-  function update() { renderFilters(); renderList(); }
+  // ---------- 지도 ----------
+  let map = null;
+  let layer = null;
+  const markers = new Map();
+  let mapBig = false;
+
+  function initMap() {
+    if (!window.L || map) return;
+    map = L.map('map', {
+      center: YEOUIDO, zoom: 15, zoomControl: true, attributionControl: true,
+      dragging: !L.Browser.mobile, tap: false, scrollWheelZoom: !L.Browser.mobile
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19, subdomains: 'abcd',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+  }
+
+  function pinIcon(p, rank) {
+    const sel = state.selected && state.selected.id === p.id;
+    if (rank <= 10 || sel) {
+      return L.divIcon({
+        className: 'pin-wrap',
+        html: `<span class="pin${sel ? ' sel' : ''}"><i>${rank}</i></span>`,
+        iconSize: [32, 38], iconAnchor: [16, 36]
+      });
+    }
+    return L.divIcon({ className: 'pin-wrap', html: '<span class="dot"></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
+  }
+
+  function renderMap(fit = true) {
+    if (!map) return;
+    layer.clearLayers(); markers.clear();
+    if (!state.loaded || state.failed) return;
+    const items = filtered().filter((p) => p.lat && p.lng).slice(0, MAP_MAX);
+    // 순위가 낮은 것부터 그려서 상위 핀이 위에 오게
+    for (let i = items.length - 1; i >= 0; i--) {
+      const p = items[i];
+      const rank = i + 1;
+      const m = L.marker([p.lat, p.lng], { icon: pinIcon(p, rank), title: p.name, keyboard: rank <= 10, zIndexOffset: rank <= 10 ? 1000 - rank : 0 });
+      m.bindTooltip(`${rank}. ${p.name}`, { direction: 'top', offset: [0, rank <= 10 ? -34 : -6] });
+      m.on('click', () => openCard(p));
+      m.addTo(layer); markers.set(p.id, m);
+    }
+    if (state.selected && !markers.has(state.selected.id) && state.selected.lat) {
+      const p = state.selected;
+      L.marker([p.lat, p.lng], { icon: pinIcon(p, '★'), zIndexOffset: 2000 }).bindTooltip(p.name, { direction: 'top', offset: [0, -34] }).addTo(layer);
+    }
+    if (fit && items.length) {
+      const b = L.latLngBounds(items.slice(0, 40).map((p) => [p.lat, p.lng]));
+      map.fitBounds(b, { padding: [28, 28], maxZoom: 17 });
+    }
+  }
+
+  function focusOnMap(p) {
+    if (!map || !p.lat) return;
+    renderMap(false);
+    const z = Math.max(map.getZoom(), 16);
+    // 데스크톱은 카드가 지도 오른쪽을 가리므로 핀이 카드 왼쪽에 보이게 중심을 옮긴다
+    const shift = isDesktop() ? 210 : 0;
+    const pt = map.project([p.lat, p.lng], z).add([shift, 0]);
+    map.setView(map.unproject(pt, z), z, { animate: true });
+    const m = markers.get(p.id);
+    if (m) m.openTooltip();
+  }
+
+  function toggleMapBig(force) {
+    mapBig = typeof force === 'boolean' ? force : !mapBig;
+    $('#map-wrap').classList.toggle('big', mapBig);
+    document.body.style.overflow = mapBig ? 'hidden' : '';
+    $('#map-toggle').textContent = mapBig ? '지도 닫기' : '지도 크게 보기';
+    if (map) {
+      if (L.Browser.mobile) { mapBig ? map.dragging.enable() : map.dragging.disable(); }
+      setTimeout(() => map.invalidateSize(), 60);
+    }
+  }
+
+  function update() { renderFilters(); renderList(); renderMap(true); renderPickScope(); }
 
   // ---------- 맛집 카드 ----------
   const isDesktop = () => window.matchMedia('(min-width: 900px)').matches;
-
-  function shareUrl(p) { return `${location.origin}/?p=${encodeURIComponent(p.id)}`; }
-  function kakaoMapUrl(p) { return `https://map.kakao.com/?q=${encodeURIComponent(p.name)}`; }
+  const shareUrl = (p) => `${location.origin}/?p=${encodeURIComponent(p.id)}`;
+  const kakaoMapUrl = (p) => `https://map.kakao.com/?q=${encodeURIComponent(p.name)}`;
 
   async function share(p, lead) {
     const url = shareUrl(p);
@@ -164,10 +256,8 @@
     }
   }
 
-  function eatLink(p, label) {
-    // 잇플로 보내는 링크: 순 사용자 집계를 위해 referrer 를 지우지 않는다(noreferrer 금지).
-    return el('a', { class: 'btn-eat', href: p.url, target: '_blank', rel: 'noopener' }, label || 'eat.pl에서 자세히 보기');
-  }
+  // 잇플로 보내는 링크: 순 사용자 집계를 위해 referrer 를 지우지 않는다(noreferrer 금지).
+  const eatLink = (p, label) => el('a', { class: 'btn-eat', href: p.url, target: '_blank', rel: 'noopener' }, label || 'eat.pl에서 자세히 보기');
 
   function cardBody(p) {
     const facts = [];
@@ -184,7 +274,7 @@
         p.foreign ? el('span', { class: 'tag coral' }, '외국인 많음') : null,
         p.local ? el('span', { class: 'tag mint' }, '동네 사람 맛집') : null
       ),
-      el('h2', { class: 'card-name', id: 'card-name' }, p.name),
+      el('h2', { class: 'card-name' }, p.name),
       el('div', { class: 'stats' },
         el('div', { class: 'stat hot' }, el('small', {}, '전국 매출 상위'), el('b', {}, pct(p.nat))),
         el('div', { class: 'stat' }, el('small', {}, '지역 매출 상위'), el('b', {}, pct(p.loc)))
@@ -195,11 +285,14 @@
   }
 
   function openCard(p, { fromShare = false } = {}) {
+    const wasOpen = !!state.selected;
     state.selected = p;
+    if (mapBig && !isDesktop()) toggleMapBig(false);
     const pane = $('#pane');
+    const desk = isDesktop();
     pane.replaceChildren(el('div', { class: 'pane-inner' },
       el('div', { class: 'pane-top' },
-        el('button', { class: 'icon-btn btn-back', type: 'button', 'aria-label': '목록으로', onclick: closeCard }, icon('M15 5l-7 7 7 7')),
+        el('button', { class: 'icon-btn btn-back', type: 'button', 'aria-label': desk ? '카드 닫기' : '목록으로', onclick: () => (desk ? closeCard() : history.back()) }, icon(desk ? 'M6 6l12 12M18 6L6 18' : 'M15 5l-7 7 7 7')),
         el('span', { class: 'jua' }, fromShare ? '친구가 보낸 도시락' : '도시락 뚜껑 열기'),
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': '공유하기', onclick: () => share(p) }, icon('M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13'))
       ),
@@ -213,64 +306,65 @@
     ));
     pane.hidden = false;
     pane.scrollTop = 0;
-    if (!isDesktop()) {
+    if (!desk) {
       document.body.style.overflow = 'hidden';
-      history.pushState({ card: p.id }, '', `?p=${encodeURIComponent(p.id)}`);
-      pane.querySelector('.btn-back').focus();
+      if (!wasOpen) history.pushState({ card: p.id }, '', `?p=${encodeURIComponent(p.id)}`);
+      else history.replaceState({ card: p.id }, '', `?p=${encodeURIComponent(p.id)}`);
     } else {
       history.replaceState({ card: p.id }, '', `?p=${encodeURIComponent(p.id)}`);
+      focusOnMap(p);
     }
+    pane.querySelector('.btn-back').focus();
     renderList();
   }
 
-  function closeCard(fromPop) {
+  function closeCard() {
     state.selected = null;
+    $('#pane').hidden = true;
     document.body.style.overflow = '';
-    if (isDesktop()) { renderEmptyPane(); }
-    else { $('#pane').hidden = true; }
-    if (fromPop !== true) history.replaceState({}, '', location.pathname);
-    renderList();
-  }
-
-  function renderEmptyPane() {
-    const pane = $('#pane');
-    pane.replaceChildren(el('div', { class: 'pane-inner', style: 'justify-content:center;align-items:center;text-align:center;gap:12px' },
-      svgUse('dori'),
-      el('p', { class: 'jua', style: 'font-size:22px;margin:0' }, '왼쪽에서 도시락을 골라 보세요'),
-      el('p', { class: 'muted', style: 'margin:0' }, '고민되면 오른쪽 위 제비뽑기!')
-    ));
-    pane.querySelector('svg').style.cssText = 'width:96px;height:96px';
+    history.replaceState({}, '', location.pathname);
+    renderList(); renderMap(false);
   }
 
   window.addEventListener('popstate', () => {
-    if (!isDesktop() && !$('#pane').hidden) closeCard(true);
-    if (!$('#pick').hidden) closePick(true);
+    if (!$('#pick').hidden) { hidePick(); return; }
+    if (!isDesktop() && !$('#pane').hidden) closeCard();
   });
 
-  // ---------- 제비뽑기 ----------
+  // ---------- 조건 제비뽑기 ----------
   function pool() {
     const items = filtered();
-    return (items.length ? items : state.places).slice(0, 30);
+    return state.top ? items.slice(0, state.top) : items;
+  }
+
+  function renderPickScope() {
+    if ($('#pick').hidden) return;
+    const n = pool().length;
+    const scope = $('#pick-scope');
+    const btn = $('#draw');
+    if (!state.loaded) { scope.textContent = '맛집 정보를 불러오는 중이에요'; btn.disabled = true; return; }
+    if (!n) { scope.textContent = '이 조건에 맞는 집이 없어요. 조건을 하나 빼 보세요.'; btn.disabled = true; return; }
+    const moods = MOODS.filter((m) => state.moods.has(m.id)).map((m) => m.label);
+    const kind = KINDS.find((k) => k.id === state.kind);
+    const parts = [regionLabel(), state.kind === 'all' ? null : kind.label, ...moods].filter(Boolean).join(' · ');
+    scope.replaceChildren(el('b', {}, `${n}곳`), ` 중에서 뽑아요 (${parts})`);
+    btn.disabled = false;
   }
 
   function openPick() {
-    const pick = $('#pick');
-    pick.hidden = false;
+    $('#pick').hidden = false;
     document.body.style.overflow = 'hidden';
-    const n = pool().length;
-    const regionLabel = REGIONS.find((r) => r.id === state.region).label;
-    $('#pick-scope').textContent = state.loaded ? `지금 조건(${regionLabel})의 매출 상위 ${n}곳 중에서 뽑아요` : '맛집 정보를 불러오는 중이에요';
     $('#pick-result').replaceChildren();
     $('#cup').classList.remove('picked');
     $('#draw').textContent = '젓가락 뽑기!';
+    renderFilters(); renderPickScope();
     history.pushState({ pick: true }, '', location.search || location.pathname);
     $('[data-close-pick]').focus();
   }
 
-  function closePick(fromPop) {
+  function hidePick() {
     $('#pick').hidden = true;
     if ($('#pane').hidden || isDesktop()) document.body.style.overflow = '';
-    if (fromPop !== true) history.back();
   }
 
   function draw() {
@@ -290,10 +384,11 @@
         el('div', { class: 'r-actions' },
           eatLink(p, 'eat.pl에서 보기'),
           el('button', { class: 'btn-sub', type: 'button', onclick: () => share(p, '제비뽑기 결과 나왔다!') }, '단톡방에 보내기'),
-          el('button', { class: 'btn-sub', type: 'button', onclick: () => { closePick(); setTimeout(() => openCard(p), 300); } }, '카드 보기')
+          el('button', { class: 'btn-sub', type: 'button', onclick: () => { history.back(); setTimeout(() => openCard(p), 300); } }, '카드 · 지도 보기')
         )
       ));
       $('#draw').textContent = '다시 뽑기';
+      $('#pick-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 520);
   }
 
@@ -304,19 +399,21 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
   }
 
-  document.querySelectorAll('[data-open-pick]').forEach((b) => b.addEventListener('click', openPick));
-  $('[data-close-pick]').addEventListener('click', () => closePick());
+  $$('[data-open-pick]').forEach((b) => b.addEventListener('click', openPick));
+  $('[data-close-pick]').addEventListener('click', () => history.back());
   $('#draw').addEventListener('click', draw);
   $('#more').addEventListener('click', () => { state.shown += PAGE; renderList(); });
+  $('#map-toggle').addEventListener('click', () => toggleMapBig());
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (!$('#pick').hidden) closePick();
-    else if (state.selected && !isDesktop()) history.back();
+    if (!$('#pick').hidden) history.back();
+    else if (mapBig) toggleMapBig(false);
+    else if (state.selected) (isDesktop() ? closeCard() : history.back());
   });
 
   async function load() {
+    initMap();
     update();
-    if (isDesktop()) renderEmptyPane();
     try {
       const r = await fetch('/api/places');
       const j = await r.json();

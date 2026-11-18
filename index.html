@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>여의도시락 · 별점 말고, 여의도가 실제로 많이 결제한 집</title>
-<meta name="description" content="여의도 점심·회식 맛집을 BC카드 결제 데이터(eat.pl 잇플) 매출 순위로 골라 드려요. 고민되면 젓가락 제비뽑기!">
+<meta name="description" content="여의도 점심·회식 맛집을 BC카드 결제 데이터(eat.pl 잇플) 매출 순위로 골라 드려요. 조건 넣고 젓가락 제비뽑기!">
 <meta property="og:type" content="website">
 <meta property="og:title" content="여의도시락 🍱 오늘 점심 뭐 먹지?">
-<meta property="og:description" content="별점 말고, 여의도가 실제로 많이 결제한 집. 고민되면 젓가락 제비뽑기!">
+<meta property="og:description" content="별점 말고, 여의도가 실제로 많이 결제한 집. 조건 넣고 젓가락 제비뽑기!">
 <meta property="og:image" content="https://yeouidosirak.vercel.app/og.png">
 <meta name="theme-color" content="#FFF8E7">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -34,13 +35,16 @@
 
     <section class="filters" aria-label="검색 조건">
       <div class="f-label" id="lbl-region">어디서?</div>
-      <div class="regions" role="group" aria-labelledby="lbl-region" id="regions"></div>
-
+      <div class="regions" role="group" aria-labelledby="lbl-region" data-group="region"></div>
       <div class="f-label" id="lbl-kind">뭐 먹지?</div>
-      <div class="chips" role="group" aria-labelledby="lbl-kind" id="kinds"></div>
-
+      <div class="chips" role="group" aria-labelledby="lbl-kind" data-group="kind"></div>
       <div class="f-label" id="lbl-mood">어떤 자리?</div>
-      <div class="chips" role="group" aria-labelledby="lbl-mood" id="moods"></div>
+      <div class="chips" role="group" aria-labelledby="lbl-mood" data-group="mood"></div>
+    </section>
+
+    <section class="map-wrap" id="map-wrap" aria-label="여의도 지도">
+      <div id="map" class="map"></div>
+      <button class="map-toggle" type="button" id="map-toggle">지도 크게 보기</button>
     </section>
 
     <div class="result-head">
@@ -52,7 +56,7 @@
 
     <footer class="foot">
       <p>eat.pl 잇플 · BC카드 결제 데이터 기반</p>
-      <p class="muted">순위는 최근 1개월 BC카드 결제 데이터 기준이며 실제 매출액은 공개되지 않아요. 영업 예상 시간은 결제 시각으로 추정한 값이라 공식 영업시간이 아니에요. 여의도시락은 BC카드·잇플의 공식 서비스가 아니에요.</p>
+      <p class="muted">순위는 최근 1개월 BC카드 결제 데이터 기준이며 실제 매출액은 공개되지 않아요. 영업 예상 시간은 결제 시각으로 추정한 값이라 공식 영업시간이 아니에요. 지도 위치는 대략적인 위치예요. 여의도시락은 BC카드·잇플의 공식 서비스가 아니에요.</p>
     </footer>
   </main>
 
@@ -65,24 +69,38 @@
       <button class="icon-btn" type="button" data-close-pick aria-label="닫기">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
-      <div class="pick-sub">오늘 뭐 먹지?</div>
+      <div class="pick-sub">조건 넣고 제비뽑기</div>
       <span class="spacer"></span>
     </div>
-    <h2 id="pick-title" class="pick-title">고민은 의도리가<br>대신 뽑아줄게요</h2>
-    <p class="muted center" id="pick-scope"></p>
-    <div class="cup" id="cup" aria-hidden="true">
-      <svg viewBox="0 0 240 270">
-        <rect x="78" y="40" width="10" height="130" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(-10 83 170)"/>
-        <rect x="100" y="30" width="10" height="140" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(-4 105 170)"/>
-        <rect x="130" y="30" width="10" height="140" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(4 135 170)"/>
-        <rect x="152" y="40" width="10" height="130" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(10 157 170)"/>
-        <rect class="lucky" x="114" y="20" width="12" height="150" rx="5" fill="#FF8A7A" stroke="#3A2E1F" stroke-width="2.5"/>
-        <path d="M50 130 H190 L176 250 Q174 262 162 262 H78 Q66 262 64 250 Z" fill="#8FD9C9" stroke="#3A2E1F" stroke-width="3" stroke-linejoin="round"/>
-        <path d="M44 122 H196 Q202 122 202 128 V136 Q202 142 196 142 H44 Q38 142 38 136 V128 Q38 122 44 122 Z" fill="#fff" stroke="#3A2E1F" stroke-width="3"/>
-        <circle cx="102" cy="190" r="5" fill="#3A2E1F"/><circle cx="138" cy="190" r="5" fill="#3A2E1F"/>
-        <ellipse cx="90" cy="204" rx="8" ry="5" fill="#FF8A7A"/><ellipse cx="150" cy="204" rx="8" ry="5" fill="#FF8A7A"/>
-        <path d="M112 206 Q120 214 128 206" stroke="#3A2E1F" stroke-width="3" fill="none" stroke-linecap="round"/>
-      </svg>
+    <h2 id="pick-title" class="pick-title">조건만 골라 주면<br>도락이가 뽑아줄게요</h2>
+
+    <div class="pick-filters">
+      <div class="f-label" id="plbl-region">어디서?</div>
+      <div class="regions small" role="group" aria-labelledby="plbl-region" data-group="region"></div>
+      <div class="f-label" id="plbl-kind">뭐 먹지?</div>
+      <div class="chips small" role="group" aria-labelledby="plbl-kind" data-group="kind"></div>
+      <div class="f-label" id="plbl-mood">어떤 자리?</div>
+      <div class="chips small" role="group" aria-labelledby="plbl-mood" data-group="mood"></div>
+      <div class="f-label" id="plbl-top">몇 곳 중에서?</div>
+      <div class="chips small" role="group" aria-labelledby="plbl-top" data-group="top"></div>
+    </div>
+
+    <div class="pick-stage">
+      <div class="cup" id="cup" aria-hidden="true">
+        <svg viewBox="0 0 240 270">
+          <rect x="78" y="40" width="10" height="130" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(-10 83 170)"/>
+          <rect x="100" y="30" width="10" height="140" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(-4 105 170)"/>
+          <rect x="130" y="30" width="10" height="140" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(4 135 170)"/>
+          <rect x="152" y="40" width="10" height="130" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(10 157 170)"/>
+          <rect class="lucky" x="114" y="20" width="12" height="150" rx="5" fill="#FF8A7A" stroke="#3A2E1F" stroke-width="2.5"/>
+          <path d="M50 130 H190 L176 250 Q174 262 162 262 H78 Q66 262 64 250 Z" fill="#8FD9C9" stroke="#3A2E1F" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M44 122 H196 Q202 122 202 128 V136 Q202 142 196 142 H44 Q38 142 38 136 V128 Q38 122 44 122 Z" fill="#fff" stroke="#3A2E1F" stroke-width="3"/>
+          <circle cx="102" cy="190" r="5" fill="#3A2E1F"/><circle cx="138" cy="190" r="5" fill="#3A2E1F"/>
+          <ellipse cx="90" cy="204" rx="8" ry="5" fill="#FF8A7A"/><ellipse cx="150" cy="204" rx="8" ry="5" fill="#FF8A7A"/>
+          <path d="M112 206 Q120 214 128 206" stroke="#3A2E1F" stroke-width="3" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <p class="pick-scope" id="pick-scope" aria-live="polite"></p>
     </div>
     <div id="pick-result" aria-live="polite"></div>
     <button class="btn-draw" type="button" id="draw">젓가락 뽑기!</button>
@@ -102,6 +120,7 @@
     </g>
   </defs>
 </svg>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="/app.js" defer></script>
 </body>
 </html>
