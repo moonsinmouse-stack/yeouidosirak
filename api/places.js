@@ -110,7 +110,7 @@ export async function loadPlaces() {
       if (!byId.has(p.id)) byId.set(p.id, p);
     }
   }
-  const data = [...byId.values()].sort((a, b) => (a.nat ?? 999) - (b.nat ?? 999));
+  const data = [...byId.values()].sort((a, b) => (a.loc ?? 999) - (b.loc ?? 999) || (a.nat ?? 999) - (b.nat ?? 999));
   if (data.length) memo = { at: Date.now(), data };
   return data;
 }
