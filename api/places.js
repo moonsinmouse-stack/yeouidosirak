@@ -46,31 +46,65 @@ function kindOf(cat) {
   return 'meal';
 }
 
-function cleanName(n) {
-  const out = (n || '')
-    .replace(/\(주\)|㈜|주식회사|\(유\)|유한회사/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return out || n;
+// 위탁급식·구내식당 운영사 (일반 손님이 이용하기 어려운 곳이 많아 목록에서 뺀다)
+const CATERER = /현대그린푸드|그린푸드|아워홈|웰스토리|프레시웨이|신세계푸드|풀무원푸드앤컬처|동원홈푸드|한화푸드테크|푸드테크|사업본부|구내식당|직원식당|사내식당|단체급식/;
+// 법인 접미사
+const CORP_TAIL = /(코퍼레이션|코퍼레이|홀딩스|컴퍼니|코리아|에프앤비|F&B|에프엔비|푸즈서비스|푸즈|푸드|산업|상사|유통|인터내셔널|글로벌)$/i;
+const FOOD_WORD = /커피|카페|베이커리|빵|치킨|피자|김밥|국밥|분식|떡볶이|스시|초밥|고기|갈비|면|탕|순대|버거|샐러드|다이닝|키친|식당|반점|횟집|포차|호프|주점|비어|와인|라멘|돈까스|돈가스|쌀국수|찌개|곰탕|설렁탕|냉면|족발|보쌈|만두|우동|소바|타코|커리|카레|도시락|죽|토스트|샌드위치|베이글|도넛|디저트|아이스크림|빙수|티|차/;
+
+// 결제 가맹점명 → 사람이 아는 가게 이름. 알아볼 수 없는 법인명만 남으면 null.
+function cleanName(raw) {
+  let n = (raw || '')
+    .replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\(사\)|\(재\)|사단법인|재단법인/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  // "브랜드/ 운영법인" → 브랜드
+  if (n.includes('/')) n = n.split('/')[0].trim() || n.replace('/', ' ').trim();
+  // 법인명이 매장명 앞에 붙어 있는 경우: "씨앤코컴퍼니카페블루포트…" → "카페블루포트…"
+  n = n.replace(/^\S+?(코퍼레이션|컴퍼니|홀딩스)(?=\S)/, '');
+  let parts = n.split(' ').filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.length === 1) {
+    const t = parts[0].replace(/(\S)코리아(?=\S*점$)/, '$1 ');
+    if (t.includes(' ')) return t;
+    if (!CORP_TAIL.test(t)) return t;
+    const stem = t.replace(CORP_TAIL, '');
+    return FOOD_WORD.test(stem) && stem.length >= 2 ? stem : null;
+  }
+  // 맨 앞 토큰이 법인명: "커피빈코리아 ○○점" → "커피빈 ○○점", "재욱다이닝컴퍼니 호앙비엣" → "호앙비엣"
+  if (CORP_TAIL.test(parts[0])) {
+    const stem = parts[0].replace(CORP_TAIL, '');
+    if (/코리아$/.test(parts[0]) && stem.length >= 2) parts[0] = stem;
+    else parts = parts.slice(1);
+  }
+  // 맨 뒤 토큰이 법인 표기: "단디만 육당당 F&B" → "단디만 육당당"
+  if (parts.length > 1 && (/^(F&B|에프앤비|에프엔비)$/i.test(parts[parts.length - 1]) || (CORP_TAIL.test(parts[parts.length - 1]) && !FOOD_WORD.test(parts[parts.length - 1].replace(CORP_TAIL, ''))))) {
+    parts = parts.slice(0, -1);
+  }
+  n = parts.join(' ').replace(/(\S)코리아(?=\S*점$)/, '$1 ').replace(/\s+/g, ' ').trim();
+  return n || null;
 }
 
-function hhmm(v) {
+// 결제 시각 기반 추정이라 30분 단위로 다듬는다: 시작은 내림(09:29 → 9:00), 끝은 올림(21:41 → 22:00)
+function roundHalfHour(v, up) {
   if (!v || !/^\d{4}$/.test(v)) return null;
-  return `${v.slice(0, 2)}:${v.slice(2)}`;
+  let m = Number(v.slice(0, 2)) * 60 + Number(v.slice(2));
+  m = up ? Math.ceil(m / 30) * 30 : Math.floor(m / 30) * 30;
+  m %= 24 * 60;
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 }
 
-function normalize(i) {
+function normalize(i, name) {
   const start = i.srtTime && /^\d{4}$/.test(i.srtTime) ? Number(i.srtTime) : null;
   const end = i.endTime && /^\d{4}$/.test(i.endTime) ? Number(i.endTime) : null;
   const overnight = start !== null && end !== null && end < start;
-  const s = hhmm(i.srtTime);
-  const e = hhmm(i.endTime);
+  const s = roundHalfHour(i.srtTime, false);
+  const e = roundHalfHour(i.endTime, true);
   const cat = i.merTpbuzNm || '';
   const [lat, lng] = toLatLng(i.xaxsVal, i.yaxsVal);
   const customers = i.vistCstmrRnkList ? Object.keys(i.vistCstmrRnkList).sort().map((k) => i.vistCstmrRnkList[k]).filter(Boolean) : [];
   return {
     id: i.merUrl.split('/').pop(),
-    name: cleanName(i.merNm),
+    name,
     addr: (i.merAddr || '').replace(/^서울 영등포구 /, ''),
     cat,
     kind: kindOf(cat),
@@ -80,7 +114,7 @@ function normalize(i) {
     nat: i.allSaleRnk,
     loc: i.ccgSaleRnk,
     url: i.merUrl,
-    hours: s && e ? `${s} – ${overnight ? '익일 ' : ''}${e}` : null,
+    hours: s && e ? `${s} – ${overnight || e === '0:00' ? '익일 ' : ''}${e}` : null,
     lunch: start !== null && start <= 1130 && (overnight || (end !== null && end >= 1330)),
     late: overnight || (end !== null && end >= 2200),
     team: !!i.empyVsitYn,
@@ -120,7 +154,10 @@ export async function loadPlaces() {
       if (!i || typeof i.merUrl !== 'string' || !i.merUrl.startsWith('https://web.paybooc.ai/')) continue;
       if (!/여의도동/.test(i.merAddr || '')) continue;
       if (/소매|편의점|마트|슈퍼|주류판매|반찬|매점/.test(i.merTpbuzNm || '')) continue;
-      const p = normalize(i);
+      if (CATERER.test(i.merNm || '')) continue;
+      const name = cleanName(i.merNm);
+      if (!name) continue;
+      const p = normalize(i, name);
       if (!byId.has(p.id)) byId.set(p.id, p);
     }
   }
@@ -147,3 +184,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ places: [], message: '지금은 맛집 정보를 불러오지 못했어요.' });
   }
 }
+export { cleanName, roundHalfHour, CATERER };

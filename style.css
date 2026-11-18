@@ -16,7 +16,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--cream); color: var(--ink);
-  font-family: 'Gowun Dodum', system-ui, -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   font-size: 15px; line-height: 1.5;
 }
 button { font: inherit; color: inherit; }
@@ -58,7 +58,7 @@ a { color: var(--ink); }
   min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid var(--ink);
   background: #fff; font-size: 14px; color: var(--ink-deep); cursor: pointer;
 }
-.chip[aria-pressed="true"] { background: var(--mint); font-weight: 700; }
+.chip[aria-pressed="true"] { background: var(--mint); font-weight: 600; }
 
 .result-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 4px; }
 .result-head h2 { margin: 0; font-size: 18px; color: var(--ink-deep); }
@@ -193,7 +193,7 @@ a { color: var(--ink); }
 }
 .map-wrap.big { position: fixed; inset: 0; z-index: 25; height: auto; border-radius: 0; border: 0; box-shadow: none; }
 .map-wrap.big .map-toggle { bottom: calc(18px + env(safe-area-inset-bottom)); right: 16px; min-height: 48px; font-size: 16px; }
-.leaflet-container { font-family: 'Gowun Dodum', sans-serif; background: #EDE6D6; }
+.leaflet-container { font-family: 'Pretendard Variable', Pretendard, sans-serif; background: #EDE6D6; }
 .pin-wrap { background: none; border: 0; }
 .pin {
   display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; margin: 0 auto;

@@ -240,7 +240,7 @@
   // ---------- 맛집 카드 ----------
   const isDesktop = () => window.matchMedia('(min-width: 900px)').matches;
   const shareUrl = (p) => `${location.origin}/?p=${encodeURIComponent(p.id)}`;
-  const kakaoMapUrl = (p) => `https://map.kakao.com/?q=${encodeURIComponent(p.name)}`;
+  const kakaoMapUrl = (p) => `https://map.kakao.com/link/search/${encodeURIComponent(p.name)}`;
 
   async function share(p, lead) {
     const url = shareUrl(p);
@@ -257,7 +257,7 @@
   }
 
   // 잇플로 보내는 링크: 순 사용자 집계를 위해 referrer 를 지우지 않는다(noreferrer 금지).
-  const eatLink = (p, label) => el('a', { class: 'btn-eat', href: p.url, target: '_blank', rel: 'noopener' }, label || 'eat.pl에서 자세히 보기');
+  const eatLink = (p, label) => el('a', { class: 'btn-eat', href: p.url, target: '_blank', rel: 'noopener' }, label || '메뉴 · 후기 요약 보기');
 
   function cardBody(p) {
     const facts = [];
@@ -300,7 +300,8 @@
       cardBody(p),
       el('div', { class: 'actions' },
         eatLink(p),
-        el('a', { class: 'btn-sub', href: kakaoMapUrl(p), target: '_blank', rel: 'noopener' }, '카카오맵에서 메뉴 · 후기 보기'),
+        el('p', { class: 'note center' }, 'BC카드 잇플(eat.pl)에서 메뉴 · AI 후기 요약 · 지금 영업 여부를 볼 수 있어요'),
+        el('a', { class: 'btn-sub', href: kakaoMapUrl(p), target: '_blank', rel: 'noopener' }, '카카오맵에서 위치 · 길찾기'),
         el('button', { class: 'btn-sub', type: 'button', onclick: () => share(p) }, '단톡방에 "오늘 여기 어때?" 보내기')
       )
     ));
@@ -382,7 +383,7 @@
         el('div', { class: 'r-name' }, p.name),
         el('div', { class: 'r-meta' }, `${p.cat} · ${REGION_NAME[p.region] || '여의도'} · 지역 매출 상위 ${pct(p.loc)}`),
         el('div', { class: 'r-actions' },
-          eatLink(p, 'eat.pl에서 보기'),
+          eatLink(p, '메뉴 · 후기 보기'),
           el('button', { class: 'btn-sub', type: 'button', onclick: () => share(p, '제비뽑기 결과 나왔다!') }, '단톡방에 보내기'),
           el('button', { class: 'btn-sub', type: 'button', onclick: () => { history.back(); setTimeout(() => openCard(p), 300); } }, '카드 · 지도 보기')
         )
