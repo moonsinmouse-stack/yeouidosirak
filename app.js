@@ -169,9 +169,9 @@
       center: YEOUIDO, zoom: 15, zoomControl: true, attributionControl: true,
       dragging: !L.Browser.mobile, tap: false, scrollWheelZoom: !L.Browser.mobile
     });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
     layer = L.layerGroup().addTo(map);
   }
