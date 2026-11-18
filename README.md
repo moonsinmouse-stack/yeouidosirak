@@ -11,7 +11,7 @@ BC카드 eat.pl 잇플 데이터(k-skill `bccard-eatpl-search` 스킬)로 여의
 ## 배포 (Vercel)
 1. vercel.com 에 GitHub 로 로그인 → Add New → Project → `yeouidosirak` Import
 2. Framework Preset: **Other**, 그대로 Deploy
-3. 나온 주소(예: `yeouidosirak-cru8.vercel.app`)를 공모전 참가 신청에 서비스 도메인으로 등록
+3. 나온 주소(예: `yeouidosirak.vercel.app`)를 공모전 참가 신청에 서비스 도메인으로 등록
 4. 주소가 다르면 `index.html` 의 `og:image` 주소를 그 주소로 바꾸기
 
 ## 데이터 고지
