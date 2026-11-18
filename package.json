@@ -1,0 +1,8 @@
+{
+  "name": "yeouidosirak",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "여의도시락 — 별점 말고, 여의도가 실제로 많이 결제한 집 (eat.pl 잇플 데이터 기반)",
+  "engines": { "node": ">=18" }
+}

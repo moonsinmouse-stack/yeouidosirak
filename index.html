@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>여의도시락 · 별점 말고, 여의도가 실제로 많이 결제한 집</title>
+<meta name="description" content="여의도 점심·회식 맛집을 BC카드 결제 데이터(eat.pl 잇플) 매출 순위로 골라 드려요. 고민되면 젓가락 제비뽑기!">
+<meta property="og:type" content="website">
+<meta property="og:title" content="여의도시락 🍱 오늘 점심 뭐 먹지?">
+<meta property="og:description" content="별점 말고, 여의도가 실제로 많이 결제한 집. 고민되면 젓가락 제비뽑기!">
+<meta property="og:image" content="https://yeouidosirak.vercel.app/og.png">
+<meta name="theme-color" content="#FFF8E7">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="layout">
+  <main class="home" id="home">
+    <header class="top">
+      <a class="logo" href="/" aria-label="여의도시락 처음으로">
+        <svg class="dori" viewBox="0 0 64 64" aria-hidden="true"><use href="#dori"/></svg>
+        <span>여의도시락</span>
+      </a>
+      <button class="btn-pick-top" type="button" data-open-pick>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l3 18M14 3l3 18"/></svg>
+        제비뽑기
+      </button>
+    </header>
+
+    <h1 class="headline">별점 말고, 여의도가 실제로<br>많이 결제한 집</h1>
+
+    <section class="filters" aria-label="검색 조건">
+      <div class="f-label" id="lbl-region">어디서?</div>
+      <div class="regions" role="group" aria-labelledby="lbl-region" id="regions"></div>
+
+      <div class="f-label" id="lbl-kind">뭐 먹지?</div>
+      <div class="chips" role="group" aria-labelledby="lbl-kind" id="kinds"></div>
+
+      <div class="f-label" id="lbl-mood">어떤 자리?</div>
+      <div class="chips" role="group" aria-labelledby="lbl-mood" id="moods"></div>
+    </section>
+
+    <div class="result-head">
+      <h2 id="result-title">결과</h2>
+      <span class="muted">매출 상위 순</span>
+    </div>
+    <ol class="list" id="list" aria-live="polite"></ol>
+    <button class="btn-more" type="button" id="more" hidden>더 보기</button>
+
+    <footer class="foot">
+      <p>eat.pl 잇플 · BC카드 결제 데이터 기반</p>
+      <p class="muted">순위는 최근 1개월 BC카드 결제 데이터 기준이며 실제 매출액은 공개되지 않아요. 영업 예상 시간은 결제 시각으로 추정한 값이라 공식 영업시간이 아니에요. 여의도시락은 BC카드·잇플의 공식 서비스가 아니에요.</p>
+    </footer>
+  </main>
+
+  <aside class="pane" id="pane" aria-label="맛집 카드" hidden></aside>
+</div>
+
+<div class="pick" id="pick" role="dialog" aria-modal="true" aria-labelledby="pick-title" hidden>
+  <div class="pick-inner">
+    <div class="pick-top">
+      <button class="icon-btn" type="button" data-close-pick aria-label="닫기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div class="pick-sub">오늘 뭐 먹지?</div>
+      <span class="spacer"></span>
+    </div>
+    <h2 id="pick-title" class="pick-title">고민은 의도리가<br>대신 뽑아줄게요</h2>
+    <p class="muted center" id="pick-scope"></p>
+    <div class="cup" id="cup" aria-hidden="true">
+      <svg viewBox="0 0 240 270">
+        <rect x="78" y="40" width="10" height="130" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(-10 83 170)"/>
+        <rect x="100" y="30" width="10" height="140" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(-4 105 170)"/>
+        <rect x="130" y="30" width="10" height="140" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(4 135 170)"/>
+        <rect x="152" y="40" width="10" height="130" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(10 157 170)"/>
+        <rect class="lucky" x="114" y="20" width="12" height="150" rx="5" fill="#FF8A7A" stroke="#3A2E1F" stroke-width="2.5"/>
+        <path d="M50 130 H190 L176 250 Q174 262 162 262 H78 Q66 262 64 250 Z" fill="#8FD9C9" stroke="#3A2E1F" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M44 122 H196 Q202 122 202 128 V136 Q202 142 196 142 H44 Q38 142 38 136 V128 Q38 122 44 122 Z" fill="#fff" stroke="#3A2E1F" stroke-width="3"/>
+        <circle cx="102" cy="190" r="5" fill="#3A2E1F"/><circle cx="138" cy="190" r="5" fill="#3A2E1F"/>
+        <ellipse cx="90" cy="204" rx="8" ry="5" fill="#FF8A7A"/><ellipse cx="150" cy="204" rx="8" ry="5" fill="#FF8A7A"/>
+        <path d="M112 206 Q120 214 128 206" stroke="#3A2E1F" stroke-width="3" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div id="pick-result" aria-live="polite"></div>
+    <button class="btn-draw" type="button" id="draw">젓가락 뽑기!</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="dori">
+      <path d="M10 44 C4 34 10 22 22 16 C34 10 46 6 54 12 C62 18 58 30 50 38 C42 48 30 56 20 56 C14 56 12 50 10 44 Z" fill="#FFD45C" stroke="#3A2E1F" stroke-width="2.5"/>
+      <circle cx="26" cy="30" r="3" fill="#3A2E1F"/><circle cx="40" cy="26" r="3" fill="#3A2E1F"/>
+      <ellipse cx="21" cy="37" rx="4" ry="2.5" fill="#FF8A7A"/><ellipse cx="45" cy="33" rx="4" ry="2.5" fill="#FF8A7A"/>
+      <path d="M30 36 Q33 39 36 35" stroke="#3A2E1F" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M31 44 L35 42 L37 50 L33 53 L30 50 Z" fill="#8FD9C9" stroke="#3A2E1F" stroke-width="1.8" stroke-linejoin="round"/>
+    </g>
+  </defs>
+</svg>
+<script src="/app.js" defer></script>
+</body>
+</html>
