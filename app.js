@@ -261,7 +261,7 @@
 
   function cardBody(p) {
     const facts = [];
-    if (p.hours) facts.push(['영업 예상 시간', p.hours]);
+    if (p.hours) facts.push(['영업 예상 시간', `${p.hours} 쯤`]);
     if (p.busyDay || p.busyTime) facts.push(['붐비는 때', [p.busyDay ? `${p.busyDay}요일` : null, p.busyTime].filter(Boolean).join(' · ')]);
     if (p.customers.length) facts.push(['주요 손님', p.customers.join(' · ')]);
     facts.push(['주소', p.addr]);
@@ -280,7 +280,7 @@
         el('div', { class: 'stat' }, el('small', {}, '지역 매출 상위'), el('b', {}, pct(p.loc)))
       ),
       el('dl', { class: 'facts' }, facts.map(([k, v]) => el('div', {}, el('dt', {}, k), el('dd', {}, v)))),
-      el('p', { class: 'note' }, '순위는 최근 1개월 BC카드 결제 데이터 기준이에요. 영업 예상 시간은 결제 시각으로 추정한 값이라 공식 영업시간이 아니에요. · eat.pl 잇플 · BC카드 결제 데이터 기반')
+      el('p', { class: 'note' }, '순위는 최근 1개월 BC카드 결제 데이터 기준이에요. 영업 예상 시간은 한 달 동안의 첫·마지막 결제 시각으로 짐작한 거라 실제와 30분쯤 다를 수 있어요. · eat.pl 잇플 · BC카드 결제 데이터 기반')
     );
   }
 
@@ -300,7 +300,7 @@
       cardBody(p),
       el('div', { class: 'actions' },
         eatLink(p),
-        el('p', { class: 'note center' }, 'BC카드 잇플(eat.pl)에서 메뉴 · AI 후기 요약 · 지금 영업 여부를 볼 수 있어요'),
+        el('p', { class: 'note center' }, 'BC카드 잇플(eat.pl)에서 메뉴 · AI 후기 요약 · 지금 영업 중인지 볼 수 있어요'),
         el('a', { class: 'btn-sub', href: kakaoMapUrl(p), target: '_blank', rel: 'noopener' }, '카카오맵에서 위치 · 길찾기'),
         el('button', { class: 'btn-sub', type: 'button', onclick: () => share(p) }, '단톡방에 "오늘 여기 어때?" 보내기')
       )

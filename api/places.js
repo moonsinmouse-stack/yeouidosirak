@@ -84,11 +84,12 @@ function cleanName(raw) {
   return n || null;
 }
 
-// 결제 시각 기반 추정이라 30분 단위로 다듬는다: 시작은 내림(09:29 → 9:00), 끝은 올림(21:41 → 22:00)
-function roundHalfHour(v, up) {
+// 한 달 동안의 첫·마지막 결제 시각이라 실제 영업시간과 어긋날 수 있다. 가장 가까운 30분 단위로 다듬는다.
+// (10:15 → 10:30, 09:52 → 10:00, 20:08 → 20:00)
+function roundHalfHour(v) {
   if (!v || !/^\d{4}$/.test(v)) return null;
   let m = Number(v.slice(0, 2)) * 60 + Number(v.slice(2));
-  m = up ? Math.ceil(m / 30) * 30 : Math.floor(m / 30) * 30;
+  m = Math.floor((m + 15) / 30) * 30;
   m %= 24 * 60;
   return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 }
@@ -97,8 +98,8 @@ function normalize(i, name) {
   const start = i.srtTime && /^\d{4}$/.test(i.srtTime) ? Number(i.srtTime) : null;
   const end = i.endTime && /^\d{4}$/.test(i.endTime) ? Number(i.endTime) : null;
   const overnight = start !== null && end !== null && end < start;
-  const s = roundHalfHour(i.srtTime, false);
-  const e = roundHalfHour(i.endTime, true);
+  const s = roundHalfHour(i.srtTime);
+  const e = roundHalfHour(i.endTime);
   const cat = i.merTpbuzNm || '';
   const [lat, lng] = toLatLng(i.xaxsVal, i.yaxsVal);
   const customers = i.vistCstmrRnkList ? Object.keys(i.vistCstmrRnkList).sort().map((k) => i.vistCstmrRnkList[k]).filter(Boolean) : [];
