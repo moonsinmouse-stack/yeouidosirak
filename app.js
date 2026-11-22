@@ -196,60 +196,60 @@
     for (const cfg of LISTS) if (cfg.scope === 'home' || cfg.scope === openScreenId) renderList(cfg);
   }
 
-  // ---------- 지도 (네이버 지도 JS v3) ----------
+  // ---------- 지도 (카카오맵 JS SDK) ----------
   let map = null;
   let tip = null;
   const markers = new Map();
   let mapBig = false;
   const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ll = (p) => new naver.maps.LatLng(p.lat, p.lng);
+  const ll = (p) => new kakao.maps.LatLng(p.lat, p.lng);
+  const htmlEl = (html) => { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; };
 
   // 지도 화면이 열려 있으면 그 화면의 조건, 아니면 홈(전체)
   const mapFilter = () => (openScreenId === 'map' ? F.map : HOME);
 
   function initMap() {
     if (map) return;
-    if (!window.naver || !naver.maps) {
-      $('#map').textContent = '지도를 불러오지 못했어요. 네이버 지도 키와 등록한 서비스 URL을 확인해 주세요.';
+    if (!window.kakao || !kakao.maps) {
+      $('#map').textContent = '지도를 불러오지 못했어요. 카카오 JavaScript 키와 등록한 웹 도메인을 확인해 주세요.';
       return;
     }
-    map = new naver.maps.Map('map', {
-      center: new naver.maps.LatLng(YEOUIDO[0], YEOUIDO[1]), zoom: 15, minZoom: 10,
-      zoomControl: true, zoomControlOptions: { position: naver.maps.Position.TOP_RIGHT },
-      scaleControl: false, mapDataControl: false,
-      draggable: !IS_MOBILE, scrollWheel: !IS_MOBILE
+    map = new kakao.maps.Map($('#map'), {
+      center: new kakao.maps.LatLng(YEOUIDO[0], YEOUIDO[1]), level: 4
     });
-    tip = new naver.maps.InfoWindow({
-      content: '', borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true,
-      pixelOffset: new naver.maps.Point(0, -4)
-    });
+    map.setMaxLevel(10);
+    map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.TOPRIGHT);
+    map.setDraggable(!IS_MOBILE);
+    map.setZoomable(!IS_MOBILE);
+    tip = new kakao.maps.CustomOverlay({ content: '', yAnchor: 1, xAnchor: 0.5, zIndex: 3000 });
   }
 
   function showTip(m, text) {
-    tip.setContent(`<div class="nm-tip">${esc(text)}</div>`);
-    tip.open(map, m);
+    tip.setContent(`<div style="pointer-events:none;padding-bottom:${m.h + 4}px"><div class="nm-tip">${esc(text)}</div></div>`);
+    tip.setPosition(m.pos);
+    tip.setMap(map);
   }
 
-  function pinIcon(p, rank) {
-    const sel = state.selected && state.selected.id === p.id;
-    if (rank <= 10 || sel) {
-      return {
-        content: `<div class="pin-wrap" style="width:32px;height:38px"><span class="pin${sel ? ' sel' : ''}"><i>${rank}</i></span></div>`,
-        size: new naver.maps.Size(32, 38), anchor: new naver.maps.Point(16, 36)
-      };
-    }
-    return {
-      content: '<div class="pin-wrap" style="width:14px;height:14px"><span class="dot"></span></div>',
-      size: new naver.maps.Size(14, 14), anchor: new naver.maps.Point(7, 7)
-    };
-  }
-
+  // 핀은 HTML 오버레이로 그린다. m = { overlay, pos, h, setMap }
   function addPin(p, rank, label, z) {
-    const m = new naver.maps.Marker({ position: ll(p), map, icon: pinIcon(p, rank), title: p.name, zIndex: z });
-    naver.maps.Event.addListener(m, 'mouseover', () => showTip(m, label));
-    naver.maps.Event.addListener(m, 'mouseout', () => tip.close());
-    return m;
+    const sel = state.selected && state.selected.id === p.id;
+    const big = rank <= 10 || sel || rank === '★';
+    const w = big ? 32 : 14;
+    const h = big ? 38 : 14;
+    const node = htmlEl(big
+      ? `<div class="pin-wrap" style="width:32px;height:38px;cursor:pointer"><span class="pin${sel ? ' sel' : ''}"><i>${rank}</i></span></div>`
+      : '<div class="pin-wrap" style="width:14px;height:14px;cursor:pointer"><span class="dot"></span></div>');
+    node.title = p.name;
+    const pos = ll(p);
+    const overlay = new kakao.maps.CustomOverlay({
+      position: pos, content: node, map, zIndex: z,
+      xAnchor: 0.5, yAnchor: big ? 36 / 38 : 0.5
+    });
+    const m = { overlay, pos, h, setMap: (x) => overlay.setMap(x) };
+    node.addEventListener('mouseenter', () => showTip(m, label));
+    node.addEventListener('mouseleave', () => tip.setMap(null));
+    return { m, node };
   }
 
   function renderMap(fit = true) {
@@ -257,25 +257,25 @@
     for (const m of markers.values()) m.setMap(null);
     markers.clear();
     if (extraPin) { extraPin.setMap(null); extraPin = null; }
-    tip.close();
+    tip.setMap(null);
     if (!state.loaded || state.failed) return;
     const items = filtered(mapFilter()).filter((p) => p.lat && p.lng).slice(0, MAP_MAX);
     // 순위가 낮은 것부터 그려서 상위 핀이 위에 오게
     for (let i = items.length - 1; i >= 0; i--) {
       const p = items[i];
       const rank = i + 1;
-      const m = addPin(p, rank, `${rank}. ${p.name}`, rank <= 10 ? 1000 - rank : 0);
-      naver.maps.Event.addListener(m, 'click', () => openCard(p));
+      const { m, node } = addPin(p, rank, `${rank}. ${p.name}`, rank <= 10 ? 1000 - rank : 0);
+      node.addEventListener('click', () => openCard(p));
       markers.set(p.id, m);
     }
     if (state.selected && !markers.has(state.selected.id) && state.selected.lat) {
-      extraPin = addPin(state.selected, '★', state.selected.name, 2000);
+      extraPin = addPin(state.selected, '★', state.selected.name, 2000).m;
     }
     if (fit && items.length) {
-      const b = new naver.maps.LatLngBounds();
+      const b = new kakao.maps.LatLngBounds();
       items.slice(0, 40).forEach((p) => b.extend(ll(p)));
-      map.fitBounds(b, { top: 28, right: 28, bottom: 28, left: 28 });
-      if (map.getZoom() > 17) map.setZoom(17, false);
+      map.setBounds(b, 28, 28, 28, 28);
+      if (map.getLevel() < 3) map.setLevel(3);
     }
   }
   let extraPin = null;
@@ -283,18 +283,15 @@
   function focusOnMap(p) {
     if (!map || !p.lat) return;
     renderMap(false);
-    const z = Math.max(map.getZoom(), 16);
-    map.setZoom(z, false);
+    if (map.getLevel() > 4) map.setLevel(4);
+    map.setCenter(ll(p));
     // 데스크톱은 카드가 지도 오른쪽을 가리므로 핀이 카드 왼쪽에 보이게 중심을 옮긴다
-    const shift = isDesktop() ? 210 : 0;
-    const proj = map.getProjection();
-    const pt = proj.fromCoordToOffset(ll(p));
-    map.panTo(proj.fromOffsetToCoord(new naver.maps.Point(pt.x + shift, pt.y)));
+    if (isDesktop()) map.panBy(210, 0);
     const m = markers.get(p.id) || extraPin;
     if (m) showTip(m, p.name);
   }
 
-  const resizeMap = () => { if (map) naver.maps.Event.trigger(map, 'resize'); };
+  const resizeMap = () => { if (map) map.relayout(); };
 
   function toggleMapBig(force) {
     mapBig = typeof force === 'boolean' ? force : !mapBig;
@@ -302,7 +299,7 @@
     document.body.style.overflow = mapBig ? 'hidden' : '';
     $('#map-toggle').textContent = mapBig ? '지도 닫기' : '지도 크게 보기';
     if (map) {
-      if (IS_MOBILE) map.setOptions({ draggable: mapBig, scrollWheel: mapBig });
+      if (IS_MOBILE) { map.setDraggable(mapBig); map.setZoomable(mapBig); }
       setTimeout(resizeMap, 60);
     }
   }
@@ -531,6 +528,7 @@
     }
     state.loaded = true;
     update();
+    refitMap(); // 레이아웃이 잡힌 뒤 지도 크기를 다시 재고 핀 범위를 맞춘다
     const want = new URLSearchParams(location.search).get('p');
     if (want) {
       const p = state.places.find((x) => x.id === want);
