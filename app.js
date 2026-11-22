@@ -235,18 +235,22 @@
   function addPin(p, rank, label, z) {
     const sel = state.selected && state.selected.id === p.id;
     const big = rank <= 10 || sel || rank === '★';
-    const w = big ? 32 : 14;
-    const h = big ? 38 : 14;
+    // 핀 끝(회전한 네모의 모서리)이 좌표에 정확히 닿도록 크기별로 앵커를 잡는다
+    // 끝 y = 핀 중심 y + 반대각선(변×0.707) − 둥근 모서리(4px) 깎임 ≈ 1.66
+    let w, h, tipY;
+    if (sel) { w = 40; h = 46; tipY = 18 + 36 * 0.7071 - 1.66; }
+    else if (big) { w = 32; h = 38; tipY = 15 + 30 * 0.7071 - 1.66; }
+    else { w = 12; h = 12; tipY = 6; }
     const node = htmlEl(big
-      ? `<div class="pin-wrap" style="width:32px;height:38px;cursor:pointer"><span class="pin${sel ? ' sel' : ''}"><i>${rank}</i></span></div>`
-      : '<div class="pin-wrap" style="width:14px;height:14px;cursor:pointer"><span class="dot"></span></div>');
+      ? `<div class="pin-wrap" style="width:${w}px;height:${h}px;cursor:pointer"><span class="pin${sel ? ' sel' : ''}"><i>${rank}</i></span></div>`
+      : `<div class="pin-wrap" style="width:${w}px;height:${h}px;cursor:pointer"><span class="dot"></span></div>`);
     node.title = p.name;
     const pos = ll(p);
     const overlay = new kakao.maps.CustomOverlay({
       position: pos, content: node, map, zIndex: z,
-      xAnchor: 0.5, yAnchor: big ? 36 / 38 : 0.5
+      xAnchor: 0.5, yAnchor: tipY / h
     });
-    const m = { overlay, pos, h, setMap: (x) => overlay.setMap(x) };
+    const m = { overlay, pos, h: tipY, setMap: (x) => overlay.setMap(x) };
     node.addEventListener('mouseenter', () => showTip(m, label));
     node.addEventListener('mouseleave', () => tip.setMap(null));
     return { m, node };
@@ -284,9 +288,17 @@
     if (!map || !p.lat) return;
     renderMap(false);
     if (map.getLevel() > 4) map.setLevel(4);
-    map.setCenter(ll(p));
-    // 데스크톱은 카드가 지도 오른쪽을 가리므로 핀이 카드 왼쪽에 보이게 중심을 옮긴다
-    if (isDesktop()) map.panBy(210, 0);
+    // 데스크톱은 카드가 지도 오른쪽을 가리므로 핀이 카드 왼쪽에 보이게 중심을 옮긴다.
+    // 순간이동 없이 최종 중심점 하나로 부드럽게 한 번만 이동한다.
+    let target = ll(p);
+    if (isDesktop()) {
+      const proj = map.getProjection();
+      const box = $('#map').getBoundingClientRect();
+      const c = proj.coordsFromContainerPoint(new kakao.maps.Point(box.width / 2, box.height / 2));
+      const r = proj.coordsFromContainerPoint(new kakao.maps.Point(box.width / 2 + 210, box.height / 2));
+      target = new kakao.maps.LatLng(target.getLat() + (r.getLat() - c.getLat()), target.getLng() + (r.getLng() - c.getLng()));
+    }
+    map.panTo(target);
     const m = markers.get(p.id) || extraPin;
     if (m) showTip(m, p.name);
   }
