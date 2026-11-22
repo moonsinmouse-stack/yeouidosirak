@@ -15,7 +15,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -26,10 +25,6 @@
         <svg class="dori" viewBox="0 0 64 64" aria-hidden="true"><use href="#dori"/></svg>
         <span>여의도시락</span>
       </a>
-      <button class="btn-pick-top" type="button" data-open-pick>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l3 18M14 3l3 18"/></svg>
-        제비뽑기
-      </button>
     </header>
 
     <div class="hero">
@@ -37,14 +32,28 @@
       <p class="subline">여의도 직장인들 영수증, 의도리가 몰래 봤어요</p>
     </div>
 
-    <section class="filters" aria-label="검색 조건">
-      <div class="f-label" id="lbl-region">어디서?</div>
-      <div class="regions" role="group" aria-labelledby="lbl-region" data-group="region"></div>
-      <div class="f-label" id="lbl-kind">뭐 먹지?</div>
-      <div class="chips" role="group" aria-labelledby="lbl-kind" data-group="kind"></div>
-      <div class="f-label" id="lbl-mood">어떤 자리?</div>
-      <div class="chips" role="group" aria-labelledby="lbl-mood" data-group="mood"></div>
-    </section>
+    <nav class="shortcuts" aria-label="바로가기">
+      <button class="sc" type="button" data-open-screen="explore">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5"/></svg>
+        <b>맛집 탐색</b><small>조건으로 찾기</small>
+      </button>
+      <button class="sc" type="button" data-open-screen="map">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+        <b>지도에서 보기</b><small>핀으로 한눈에</small>
+      </button>
+      <button class="sc" type="button" data-open-screen="pick">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l3 18M14 3l3 18"/></svg>
+        <b>제비뽑기</b><small>젓가락으로 뽑기</small>
+      </button>
+      <button class="sc" type="button" data-open-screen="top30">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5v2a3 3 0 0 0 3 3M16 6h3v2a3 3 0 0 1-3 3M12 13v4M9 21h6M10 17h4"/></svg>
+        <b>TOP30</b><small>가장 많이 결제된 집</small>
+      </button>
+      <button class="sc" type="button" data-open-screen="local">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9zM9 21v-6h6v6"/></svg>
+        <b>동네 인기</b><small>동네 사람 맛집</small>
+      </button>
+    </nav>
 
     <section class="map-wrap" id="map-wrap" aria-label="여의도 지도">
       <div id="map" class="map"></div>
@@ -67,26 +76,73 @@
   <aside class="pane" id="pane" aria-label="맛집 카드" hidden></aside>
 </div>
 
-<div class="pick" id="pick" role="dialog" aria-modal="true" aria-labelledby="pick-title" hidden>
-  <div class="pick-inner">
-    <div class="pick-top">
-      <button class="icon-btn" type="button" data-close-pick aria-label="닫기">
+<div class="screen" id="screen-explore" role="dialog" aria-modal="true" aria-labelledby="t-explore" hidden>
+  <div class="screen-inner">
+    <div class="screen-top">
+      <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
-      <div class="pick-sub">조건 넣고 제비뽑기</div>
       <span class="spacer"></span>
     </div>
-    <h2 id="pick-title" class="pick-title">조건만 골라 주면<br>의도리가 뽑아줄게요</h2>
+    <h2 id="t-explore" class="screen-title">맛집 탐색</h2>
+    <p class="screen-desc">지역, 메뉴 종류, 분위기, 주요 방문 고객층으로 여의도 맛집을 좁혀 봐요</p>
+    <div class="screen-filters">
+      <div class="f-label" id="xl-region">어디서?</div>
+      <div class="regions small" role="group" aria-labelledby="xl-region" data-scope="explore" data-group="region"></div>
+      <div class="f-label" id="xl-kind">뭐 먹지?</div>
+      <div class="chips small" role="group" aria-labelledby="xl-kind" data-scope="explore" data-group="kind"></div>
+      <div class="f-label" id="xl-mood">어떤 자리?</div>
+      <div class="chips small" role="group" aria-labelledby="xl-mood" data-scope="explore" data-group="mood"></div>
+      <div class="f-label" id="xl-cust">주요 방문 고객층</div>
+      <div class="chips small" role="group" aria-labelledby="xl-cust" data-scope="explore" data-group="cust"></div>
+    </div>
+    <div class="result-head"><h3 id="xtitle"></h3></div>
+    <ol class="list" id="xlist" aria-live="polite"></ol>
+    <button class="btn-more" type="button" id="xmore" hidden>더 보기</button>
+    <footer class="screen-foot">eat.pl 잇플 · BC카드 결제 데이터 기준 · 지역 매출 상위 순</footer>
+  </div>
+</div>
 
-    <div class="pick-filters">
+<div class="screen" id="screen-map" role="dialog" aria-modal="true" aria-labelledby="t-map" hidden>
+  <div class="screen-inner">
+    <div class="screen-top">
+      <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <span class="spacer"></span>
+    </div>
+    <h2 id="t-map" class="screen-title">지도에서 보기</h2>
+    <p class="screen-desc">조건에 맞는 맛집을 지도 위 핀으로 한눈에 봐요. 핀을 누르면 가게 카드가 열려요</p>
+    <div class="screen-filters">
+      <div class="f-label" id="ml-region">어디서?</div>
+      <div class="regions small" role="group" aria-labelledby="ml-region" data-scope="map" data-group="region"></div>
+      <div class="f-label" id="ml-kind">뭐 먹지?</div>
+      <div class="chips small" role="group" aria-labelledby="ml-kind" data-scope="map" data-group="kind"></div>
+    </div>
+    <div class="map-slot" id="map-slot"></div>
+    <footer class="screen-foot">eat.pl 잇플 · BC카드 결제 데이터 기준 · 핀 번호는 지역 매출 상위 순 · 위치는 대략적이에요</footer>
+  </div>
+</div>
+
+<div class="screen pick" id="screen-pick" role="dialog" aria-modal="true" aria-labelledby="t-pick" hidden>
+  <div class="screen-inner">
+    <div class="screen-top">
+      <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <span class="spacer"></span>
+    </div>
+    <h2 id="t-pick" class="screen-title">제비뽑기</h2>
+    <p class="screen-desc">조건만 골라 주면 의도리가 뽑아줄게요</p>
+    <div class="screen-filters">
       <div class="f-label" id="plbl-region">어디서?</div>
-      <div class="regions small" role="group" aria-labelledby="plbl-region" data-group="region"></div>
+      <div class="regions small" role="group" aria-labelledby="plbl-region" data-scope="pick" data-group="region"></div>
       <div class="f-label" id="plbl-kind">뭐 먹지?</div>
-      <div class="chips small" role="group" aria-labelledby="plbl-kind" data-group="kind"></div>
+      <div class="chips small" role="group" aria-labelledby="plbl-kind" data-scope="pick" data-group="kind"></div>
       <div class="f-label" id="plbl-mood">어떤 자리?</div>
-      <div class="chips small" role="group" aria-labelledby="plbl-mood" data-group="mood"></div>
+      <div class="chips small" role="group" aria-labelledby="plbl-mood" data-scope="pick" data-group="mood"></div>
       <div class="f-label" id="plbl-top">몇 곳 중에서?</div>
-      <div class="chips small" role="group" aria-labelledby="plbl-top" data-group="top"></div>
+      <div class="chips small" role="group" aria-labelledby="plbl-top" data-scope="pick" data-group="top"></div>
     </div>
 
     <div class="pick-stage">
@@ -108,6 +164,50 @@
     </div>
     <div id="pick-result" aria-live="polite"></div>
     <button class="btn-draw" type="button" id="draw">젓가락 뽑기!</button>
+    <footer class="screen-foot">eat.pl 잇플 · BC카드 결제 데이터 기준 · 지역 매출 상위 순 후보에서 무작위</footer>
+  </div>
+</div>
+
+<div class="screen" id="screen-top30" role="dialog" aria-modal="true" aria-labelledby="t-top30" hidden>
+  <div class="screen-inner">
+    <div class="screen-top">
+      <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <span class="spacer"></span>
+    </div>
+    <h2 id="t-top30" class="screen-title">TOP30</h2>
+    <p class="screen-desc">여의도에서 가장 많이 결제된 맛집 30곳이에요. 주요 방문 고객층으로 좁혀 볼 수도 있어요</p>
+    <div class="screen-filters">
+      <div class="f-label" id="tl-region">어디서?</div>
+      <div class="regions small" role="group" aria-labelledby="tl-region" data-scope="top30" data-group="region"></div>
+      <div class="f-label" id="tl-cust">주요 방문 고객층</div>
+      <div class="chips small" role="group" aria-labelledby="tl-cust" data-scope="top30" data-group="cust"></div>
+    </div>
+    <div class="result-head"><h3 id="ttitle"></h3></div>
+    <ol class="list" id="tlist" aria-live="polite"></ol>
+    <footer class="screen-foot">eat.pl 잇플 · BC카드 결제 데이터 기준 · 지역 매출 상위 순</footer>
+  </div>
+</div>
+
+<div class="screen" id="screen-local" role="dialog" aria-modal="true" aria-labelledby="t-local" hidden>
+  <div class="screen-inner">
+    <div class="screen-top">
+      <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <span class="spacer"></span>
+    </div>
+    <h2 id="t-local" class="screen-title">동네 인기</h2>
+    <p class="screen-desc">잇플이 동네 사람들에게 인기 있다고 표시한 맛집만 모았어요</p>
+    <div class="screen-filters">
+      <div class="f-label" id="ll-region">어디서?</div>
+      <div class="regions small" role="group" aria-labelledby="ll-region" data-scope="local" data-group="region"></div>
+    </div>
+    <div class="result-head"><h3 id="ltitle"></h3></div>
+    <ol class="list" id="llist" aria-live="polite"></ol>
+    <button class="btn-more" type="button" id="lmore" hidden>더 보기</button>
+    <footer class="screen-foot">잇플 동네 인기 표시 기준 · 지역 매출 상위 순</footer>
   </div>
 </div>
 
@@ -124,7 +224,7 @@
     </g>
   </defs>
 </svg>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=YOUR_NCP_KEY_ID"></script>
 <script src="/app.js" defer></script>
 </body>
 </html>

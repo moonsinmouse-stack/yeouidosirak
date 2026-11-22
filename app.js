@@ -25,23 +25,45 @@
     { id: 30, label: '상위 30곳' },
     { id: 0, label: '조건에 맞는 전부' }
   ];
+  // 잇플 '주요 방문 고객층'(예: 30대남성, 60대이상여성)을 연령대 + 성별 6개로 묶는다.
+  const GROUPS = [
+    { id: 'f2030', label: '2030 여성' },
+    { id: 'm2030', label: '2030 남성' },
+    { id: 'f4050', label: '4050 여성' },
+    { id: 'm4050', label: '4050 남성' },
+    { id: 'f60', label: '60대 이상 여성' },
+    { id: 'm60', label: '60대 이상 남성' }
+  ];
+  function groupOf(text) {
+    const m = /^(\d+)대(이상)?(여성|남성)$/.exec(String(text || '').replace(/\s+/g, ''));
+    if (!m) return null;
+    const sex = m[3] === '여성' ? 'f' : 'm';
+    const age = Number(m[1]);
+    if (age >= 60) return `${sex}60`;
+    if (age >= 40) return `${sex}4050`;
+    if (age >= 20) return `${sex}2030`;
+    return null;
+  }
   const REGION_NAME = { seo: '서여의도', center: '더현대·IFC', dong: '동여의도' };
   const PAGE = 20;
   const MAP_MAX = 150;
   const YEOUIDO = [37.5238, 126.9265];
 
-  const state = {
-    places: [],
-    loaded: false,
-    failed: false,
-    region: 'all',
-    kind: 'meal',
-    moods: new Set(['lunch']),
-    top: 30,
-    shown: PAGE,
-    selected: null,
-    lastPick: null
+  const state = { places: [], loaded: false, failed: false, selected: null, lastPick: null };
+
+  // 홈은 조건 없이 전체를 보여 주고, 바로가기 화면마다 자기 조건을 따로 가진다.
+  const newFilter = (o = {}) => ({ region: 'all', kind: 'all', moods: new Set(), groups: new Set(), local: false, ...o });
+  const HOME = newFilter();
+  const F = {
+    explore: newFilter(),
+    map: newFilter(),
+    top30: newFilter(),
+    local: newFilter({ local: true }),
+    pick: newFilter({ kind: 'meal', moods: new Set(['lunch']), top: 30 }) // 기존 제비뽑기 기본 조건 유지
   };
+  const SHOWN = { home: PAGE, explore: PAGE, local: PAGE };
+  const TOP_N = 30;
+  let openScreenId = null;
 
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
@@ -70,13 +92,15 @@
     return s;
   };
   const pct = (v) => (v === null || v === undefined ? '–' : `${v}%`);
-  const regionLabel = () => REGIONS.find((r) => r.id === state.region).label;
+  const regionLabel = (f) => REGIONS.find((r) => r.id === f.region).label;
 
-  function filtered() {
+  function filtered(f) {
     return state.places.filter((p) => {
-      if (state.region !== 'all' && p.region !== state.region) return false;
-      if (state.kind !== 'all' && p.kind !== state.kind) return false;
-      for (const m of state.moods) if (!p[m]) return false;
+      if (f.region !== 'all' && p.region !== f.region) return false;
+      if (f.kind !== 'all' && p.kind !== f.kind) return false;
+      if (f.local && !p.local) return false;
+      for (const m of f.moods) if (!p[m]) return false;
+      if (f.groups.size && ![...f.groups].some((g) => p.groups.has(g))) return false;
       return true;
     });
   }
@@ -90,60 +114,70 @@
     return t;
   }
 
-  // ---------- 조건 버튼 (홈·제비뽑기 화면이 같은 조건을 공유) ----------
-  function changed() { state.shown = PAGE; update(); }
+  // ---------- 조건 버튼 (화면마다 자기 조건을 가진다: data-scope) ----------
+  function changed(scope) { if (scope in SHOWN) SHOWN[scope] = PAGE; update(); }
 
   function renderFilters() {
-    for (const box of $$('[data-group="region"]')) {
-      box.replaceChildren(...REGIONS.map((r) => el('button', {
-        class: 'region', type: 'button', 'aria-pressed': String(state.region === r.id),
-        onclick: () => { state.region = r.id; changed(); }
-      }, el('b', {}, r.label), el('small', {}, r.sub))));
-    }
-    for (const box of $$('[data-group="kind"]')) {
-      box.replaceChildren(...KINDS.map((k) => el('button', {
-        class: 'chip', type: 'button', 'aria-pressed': String(state.kind === k.id),
-        onclick: () => { state.kind = k.id; changed(); }
-      }, k.label)));
-    }
-    for (const box of $$('[data-group="mood"]')) {
-      box.replaceChildren(...MOODS.map((m) => {
-        const on = state.moods.has(m.id);
-        return el('button', {
-          class: 'chip', type: 'button', 'aria-pressed': String(on),
-          onclick: () => { on ? state.moods.delete(m.id) : state.moods.add(m.id); changed(); }
-        }, m.label);
-      }));
-    }
-    for (const box of $$('[data-group="top"]')) {
-      box.replaceChildren(...TOPS.map((t) => el('button', {
-        class: 'chip', type: 'button', 'aria-pressed': String(state.top === t.id),
-        onclick: () => { state.top = t.id; changed(); }
-      }, t.label)));
+    for (const box of $$('[data-scope]')) {
+      const scope = box.dataset.scope;
+      const f = F[scope];
+      const single = (key, val) => () => { f[key] = val; changed(scope); };
+      const multi = (set, id) => () => { set.has(id) ? set.delete(id) : set.add(id); changed(scope); };
+      const chip = (label, on, onclick) => el('button', { class: 'chip', type: 'button', 'aria-pressed': String(on), onclick }, label);
+      switch (box.dataset.group) {
+        case 'region':
+          box.replaceChildren(...REGIONS.map((r) => el('button', {
+            class: 'region', type: 'button', 'aria-pressed': String(f.region === r.id), onclick: single('region', r.id)
+          }, el('b', {}, r.label), el('small', {}, r.sub))));
+          break;
+        case 'kind':
+          box.replaceChildren(...KINDS.map((k) => chip(k.label, f.kind === k.id, single('kind', k.id))));
+          break;
+        case 'mood':
+          box.replaceChildren(...MOODS.map((m) => chip(m.label, f.moods.has(m.id), multi(f.moods, m.id))));
+          break;
+        case 'cust':
+          box.replaceChildren(...GROUPS.map((g) => chip(g.label, f.groups.has(g.id), multi(f.groups, g.id))));
+          break;
+        case 'top':
+          box.replaceChildren(...TOPS.map((t) => chip(t.label, f.top === t.id, single('top', t.id))));
+          break;
+      }
     }
   }
 
-  // ---------- 목록 ----------
-  function renderList() {
-    const list = $('#list'); list.replaceChildren();
-    const more = $('#more');
+  // ---------- 목록 (홈 + 바로가기 화면) ----------
+  const LISTS = [
+    { scope: 'home', f: HOME, list: '#list', more: '#more', title: '#result-title', name: (f, n) => `${regionLabel(f)} ${n}곳` },
+    { scope: 'explore', f: F.explore, list: '#xlist', more: '#xmore', title: '#xtitle', name: (f, n) => `${regionLabel(f)} ${n}곳` },
+    { scope: 'top30', f: F.top30, list: '#tlist', more: null, title: '#ttitle', max: TOP_N, name: (f, n) => `${regionLabel(f)} 상위 ${n}곳` },
+    { scope: 'local', f: F.local, list: '#llist', more: '#lmore', title: '#ltitle', name: (f, n) => `${regionLabel(f)} 동네 인기 ${n}곳` }
+  ];
+
+  function renderList(cfg) {
+    const list = $(cfg.list); list.replaceChildren();
+    const more = cfg.more ? $(cfg.more) : null;
+    const title = $(cfg.title);
+    if (more) more.hidden = true;
     if (!state.loaded) {
-      $('#result-title').textContent = '불러오는 중…';
+      title.textContent = '불러오는 중…';
       for (let i = 0; i < 4; i++) list.append(el('li', { class: 'skeleton', 'aria-hidden': 'true' }));
-      more.hidden = true; return;
+      return;
     }
     if (state.failed) {
-      $('#result-title').textContent = '앗, 잠깐만요';
+      title.textContent = '앗, 잠깐만요';
       list.append(el('li', { class: 'empty' }, '지금은 맛집 정보를 불러오지 못했어요. 잠시 후 다시 열어 주세요.'));
-      more.hidden = true; return;
+      return;
     }
-    const items = filtered();
-    $('#result-title').textContent = `${regionLabel()} ${items.length}곳`;
+    let items = filtered(cfg.f);
+    if (cfg.max) items = items.slice(0, cfg.max);
+    title.textContent = cfg.name(cfg.f, items.length);
     if (!items.length) {
       list.append(el('li', { class: 'empty' }, '이 조건에 맞는 집이 없어요. 조건을 하나 빼 보세요.'));
-      more.hidden = true; return;
+      return;
     }
-    items.slice(0, state.shown).forEach((p, i) => {
+    const limit = cfg.max ? items.length : SHOWN[cfg.scope];
+    items.slice(0, limit).forEach((p, i) => {
       list.append(el('li', {},
         el('button', {
           class: 'row', type: 'button', 'aria-current': state.selected && state.selected.id === p.id ? 'true' : null,
@@ -154,75 +188,113 @@
           el('span', { class: 'row-num' }, el('small', {}, '지역 상위'), el('b', {}, pct(p.loc)))
         )));
     });
-    more.hidden = items.length <= state.shown;
+    if (more) more.hidden = items.length <= limit;
   }
 
-  // ---------- 지도 ----------
+  // 홈은 항상, 바로가기 화면은 열려 있을 때만 그린다.
+  function renderLists() {
+    for (const cfg of LISTS) if (cfg.scope === 'home' || cfg.scope === openScreenId) renderList(cfg);
+  }
+
+  // ---------- 지도 (네이버 지도 JS v3) ----------
   let map = null;
-  let layer = null;
+  let tip = null;
   const markers = new Map();
   let mapBig = false;
+  const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const ll = (p) => new naver.maps.LatLng(p.lat, p.lng);
+
+  // 지도 화면이 열려 있으면 그 화면의 조건, 아니면 홈(전체)
+  const mapFilter = () => (openScreenId === 'map' ? F.map : HOME);
 
   function initMap() {
-    if (!window.L || map) return;
-    map = L.map('map', {
-      center: YEOUIDO, zoom: 15, zoomControl: true, attributionControl: true,
-      dragging: !L.Browser.mobile, tap: false, scrollWheelZoom: !L.Browser.mobile
+    if (map) return;
+    if (!window.naver || !naver.maps) {
+      $('#map').textContent = '지도를 불러오지 못했어요. 네이버 지도 키와 등록한 서비스 URL을 확인해 주세요.';
+      return;
+    }
+    map = new naver.maps.Map('map', {
+      center: new naver.maps.LatLng(YEOUIDO[0], YEOUIDO[1]), zoom: 15, minZoom: 10,
+      zoomControl: true, zoomControlOptions: { position: naver.maps.Position.TOP_RIGHT },
+      scaleControl: false, mapDataControl: false,
+      draggable: !IS_MOBILE, scrollWheel: !IS_MOBILE
     });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
-    layer = L.layerGroup().addTo(map);
+    tip = new naver.maps.InfoWindow({
+      content: '', borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true,
+      pixelOffset: new naver.maps.Point(0, -4)
+    });
+  }
+
+  function showTip(m, text) {
+    tip.setContent(`<div class="nm-tip">${esc(text)}</div>`);
+    tip.open(map, m);
   }
 
   function pinIcon(p, rank) {
     const sel = state.selected && state.selected.id === p.id;
     if (rank <= 10 || sel) {
-      return L.divIcon({
-        className: 'pin-wrap',
-        html: `<span class="pin${sel ? ' sel' : ''}"><i>${rank}</i></span>`,
-        iconSize: [32, 38], iconAnchor: [16, 36]
-      });
+      return {
+        content: `<div class="pin-wrap" style="width:32px;height:38px"><span class="pin${sel ? ' sel' : ''}"><i>${rank}</i></span></div>`,
+        size: new naver.maps.Size(32, 38), anchor: new naver.maps.Point(16, 36)
+      };
     }
-    return L.divIcon({ className: 'pin-wrap', html: '<span class="dot"></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
+    return {
+      content: '<div class="pin-wrap" style="width:14px;height:14px"><span class="dot"></span></div>',
+      size: new naver.maps.Size(14, 14), anchor: new naver.maps.Point(7, 7)
+    };
+  }
+
+  function addPin(p, rank, label, z) {
+    const m = new naver.maps.Marker({ position: ll(p), map, icon: pinIcon(p, rank), title: p.name, zIndex: z });
+    naver.maps.Event.addListener(m, 'mouseover', () => showTip(m, label));
+    naver.maps.Event.addListener(m, 'mouseout', () => tip.close());
+    return m;
   }
 
   function renderMap(fit = true) {
     if (!map) return;
-    layer.clearLayers(); markers.clear();
+    for (const m of markers.values()) m.setMap(null);
+    markers.clear();
+    if (extraPin) { extraPin.setMap(null); extraPin = null; }
+    tip.close();
     if (!state.loaded || state.failed) return;
-    const items = filtered().filter((p) => p.lat && p.lng).slice(0, MAP_MAX);
+    const items = filtered(mapFilter()).filter((p) => p.lat && p.lng).slice(0, MAP_MAX);
     // 순위가 낮은 것부터 그려서 상위 핀이 위에 오게
     for (let i = items.length - 1; i >= 0; i--) {
       const p = items[i];
       const rank = i + 1;
-      const m = L.marker([p.lat, p.lng], { icon: pinIcon(p, rank), title: p.name, keyboard: rank <= 10, zIndexOffset: rank <= 10 ? 1000 - rank : 0 });
-      m.bindTooltip(`${rank}. ${p.name}`, { direction: 'top', offset: [0, rank <= 10 ? -34 : -6] });
-      m.on('click', () => openCard(p));
-      m.addTo(layer); markers.set(p.id, m);
+      const m = addPin(p, rank, `${rank}. ${p.name}`, rank <= 10 ? 1000 - rank : 0);
+      naver.maps.Event.addListener(m, 'click', () => openCard(p));
+      markers.set(p.id, m);
     }
     if (state.selected && !markers.has(state.selected.id) && state.selected.lat) {
-      const p = state.selected;
-      L.marker([p.lat, p.lng], { icon: pinIcon(p, '★'), zIndexOffset: 2000 }).bindTooltip(p.name, { direction: 'top', offset: [0, -34] }).addTo(layer);
+      extraPin = addPin(state.selected, '★', state.selected.name, 2000);
     }
     if (fit && items.length) {
-      const b = L.latLngBounds(items.slice(0, 40).map((p) => [p.lat, p.lng]));
-      map.fitBounds(b, { padding: [28, 28], maxZoom: 17 });
+      const b = new naver.maps.LatLngBounds();
+      items.slice(0, 40).forEach((p) => b.extend(ll(p)));
+      map.fitBounds(b, { top: 28, right: 28, bottom: 28, left: 28 });
+      if (map.getZoom() > 17) map.setZoom(17, false);
     }
   }
+  let extraPin = null;
 
   function focusOnMap(p) {
     if (!map || !p.lat) return;
     renderMap(false);
     const z = Math.max(map.getZoom(), 16);
+    map.setZoom(z, false);
     // 데스크톱은 카드가 지도 오른쪽을 가리므로 핀이 카드 왼쪽에 보이게 중심을 옮긴다
     const shift = isDesktop() ? 210 : 0;
-    const pt = map.project([p.lat, p.lng], z).add([shift, 0]);
-    map.setView(map.unproject(pt, z), z, { animate: true });
-    const m = markers.get(p.id);
-    if (m) m.openTooltip();
+    const proj = map.getProjection();
+    const pt = proj.fromCoordToOffset(ll(p));
+    map.panTo(proj.fromOffsetToCoord(new naver.maps.Point(pt.x + shift, pt.y)));
+    const m = markers.get(p.id) || extraPin;
+    if (m) showTip(m, p.name);
   }
+
+  const resizeMap = () => { if (map) naver.maps.Event.trigger(map, 'resize'); };
 
   function toggleMapBig(force) {
     mapBig = typeof force === 'boolean' ? force : !mapBig;
@@ -230,12 +302,25 @@
     document.body.style.overflow = mapBig ? 'hidden' : '';
     $('#map-toggle').textContent = mapBig ? '지도 닫기' : '지도 크게 보기';
     if (map) {
-      if (L.Browser.mobile) { mapBig ? map.dragging.enable() : map.dragging.disable(); }
-      setTimeout(() => map.invalidateSize(), 60);
+      if (IS_MOBILE) map.setOptions({ draggable: mapBig, scrollWheel: mapBig });
+      setTimeout(resizeMap, 60);
     }
   }
 
-  function update() { renderFilters(); renderList(); renderMap(true); renderPickScope(); }
+  // 지도 화면에서는 같은 지도를 화면 안으로 옮겨 쓴다 (지도 인스턴스는 하나)
+  // 컨테이너 크기가 바뀐 뒤에 크기를 다시 재고 핀 범위를 맞춘다
+  const refitMap = () => { if (map) setTimeout(() => { resizeMap(); renderMap(true); }, 80); };
+  function attachMap() {
+    if (mapBig) toggleMapBig(false);
+    $('#map-slot').append($('#map'));
+    refitMap();
+  }
+  function detachMap() {
+    $('#map-wrap').prepend($('#map'));
+    refitMap();
+  }
+
+  function update() { renderFilters(); renderLists(); renderMap(true); renderPickScope(); }
 
   // ---------- 맛집 카드 ----------
   const isDesktop = () => window.matchMedia('(min-width: 900px)').matches;
@@ -316,7 +401,7 @@
       focusOnMap(p);
     }
     pane.querySelector('.btn-back').focus();
-    renderList();
+    renderLists();
   }
 
   function closeCard() {
@@ -324,48 +409,63 @@
     $('#pane').hidden = true;
     document.body.style.overflow = '';
     history.replaceState({}, '', location.pathname);
-    renderList(); renderMap(false);
+    renderLists(); renderMap(false);
   }
 
+  // 모바일: 카드가 화면 위에 열려 있으면 카드부터 닫고, 그다음 뒤로가기가 화면을 닫는다.
   window.addEventListener('popstate', () => {
-    if (!$('#pick').hidden) { hidePick(); return; }
-    if (!isDesktop() && !$('#pane').hidden) closeCard();
+    if (!isDesktop() && !$('#pane').hidden) { closeCard(); return; }
+    if (openScreenId) hideScreen();
   });
+
+  // ---------- 바로가기 화면 ----------
+  function openScreen(id) {
+    if (openScreenId) return;
+    openScreenId = id;
+    const s = $(`#screen-${id}`);
+    s.hidden = false; s.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    if (id === 'map') attachMap();
+    if (id === 'pick') resetPick();
+    update();
+    history.pushState({ screen: id }, '', location.search || location.pathname);
+    s.querySelector('[data-close-screen]').focus();
+  }
+
+  function hideScreen() {
+    if (!openScreenId) return;
+    const id = openScreenId;
+    openScreenId = null;
+    $(`#screen-${id}`).hidden = true;
+    if (id === 'map') detachMap();
+    if ($('#pane').hidden || isDesktop()) document.body.style.overflow = '';
+    if (id !== 'map') renderMap(true);
+  }
 
   // ---------- 조건 제비뽑기 ----------
   function pool() {
-    const items = filtered();
-    return state.top ? items.slice(0, state.top) : items;
+    const items = filtered(F.pick);
+    return F.pick.top ? items.slice(0, F.pick.top) : items;
   }
 
   function renderPickScope() {
-    if ($('#pick').hidden) return;
+    if (openScreenId !== 'pick') return;
     const n = pool().length;
     const scope = $('#pick-scope');
     const btn = $('#draw');
     if (!state.loaded) { scope.textContent = '맛집 정보를 불러오는 중이에요'; btn.disabled = true; return; }
     if (!n) { scope.textContent = '이 조건에 맞는 집이 없어요. 조건을 하나 빼 보세요.'; btn.disabled = true; return; }
-    const moods = MOODS.filter((m) => state.moods.has(m.id)).map((m) => m.label);
-    const kind = KINDS.find((k) => k.id === state.kind);
-    const parts = [regionLabel(), state.kind === 'all' ? null : kind.label, ...moods].filter(Boolean).join(' · ');
+    const moods = MOODS.filter((m) => F.pick.moods.has(m.id)).map((m) => m.label);
+    const kind = KINDS.find((k) => k.id === F.pick.kind);
+    const parts = [regionLabel(F.pick), F.pick.kind === 'all' ? null : kind.label, ...moods].filter(Boolean).join(' · ');
     scope.replaceChildren(el('b', {}, `${n}곳`), ` 중에서 뽑아요 (${parts})`);
     btn.disabled = false;
   }
 
-  function openPick() {
-    $('#pick').hidden = false;
-    document.body.style.overflow = 'hidden';
+  function resetPick() {
     $('#pick-result').replaceChildren();
     $('#cup').classList.remove('picked');
     $('#draw').textContent = '젓가락 뽑기!';
-    renderFilters(); renderPickScope();
-    history.pushState({ pick: true }, '', location.search || location.pathname);
-    $('[data-close-pick]').focus();
-  }
-
-  function hidePick() {
-    $('#pick').hidden = true;
-    if ($('#pane').hidden || isDesktop()) document.body.style.overflow = '';
   }
 
   function draw() {
@@ -400,16 +500,18 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
   }
 
-  $$('[data-open-pick]').forEach((b) => b.addEventListener('click', openPick));
-  $('[data-close-pick]').addEventListener('click', () => history.back());
+  $$('[data-open-screen]').forEach((b) => b.addEventListener('click', () => openScreen(b.dataset.openScreen)));
+  $$('[data-close-screen]').forEach((b) => b.addEventListener('click', () => history.back()));
   $('#draw').addEventListener('click', draw);
-  $('#more').addEventListener('click', () => { state.shown += PAGE; renderList(); });
+  for (const cfg of LISTS) {
+    if (cfg.more) $(cfg.more).addEventListener('click', () => { SHOWN[cfg.scope] += PAGE; renderLists(); });
+  }
   $('#map-toggle').addEventListener('click', () => toggleMapBig());
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (!$('#pick').hidden) history.back();
+    if (state.selected) (isDesktop() ? closeCard() : history.back());
+    else if (openScreenId) history.back();
     else if (mapBig) toggleMapBig(false);
-    else if (state.selected) (isDesktop() ? closeCard() : history.back());
   });
 
   async function load() {
@@ -419,6 +521,10 @@
       const r = await fetch('/api/places');
       const j = await r.json();
       state.places = Array.isArray(j.places) ? j.places : [];
+      for (const p of state.places) {
+        p.customers = Array.isArray(p.customers) ? p.customers : [];
+        p.groups = new Set(p.customers.map(groupOf).filter(Boolean));
+      }
       state.failed = !state.places.length;
     } catch {
       state.failed = true;
