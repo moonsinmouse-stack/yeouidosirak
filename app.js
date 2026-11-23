@@ -226,9 +226,94 @@
   }
 
   function showTip(m, text) {
-    tip.setContent(`<div style="pointer-events:none;padding-bottom:${m.h + 4}px"><div class="nm-tip">${esc(text)}</div></div>`);
+    const node = htmlEl(`<div style="pointer-events:none;padding-bottom:${m.h + 4}px"><div class="nm-tip">${esc(text)}</div></div>`);
+    tip.setContent(node);
     tip.setPosition(m.pos);
     tip.setMap(map);
+    // 카카오가 감싸는 바깥 래퍼도 클릭을 통과시켜야 아래 핀이 눌린다
+    if (node.parentElement) node.parentElement.style.pointerEvents = 'none';
+  }
+
+  // ---------- 실제 매장 좌표 보정 (카카오 장소 검색) ----------
+  // 잇플 좌표는 주소 지점이라 같은 건물 안에서 실제 매장과 어긋날 수 있다.
+  // 카카오 장소 검색에서 같은 도로명 주소 + 비슷한 이름의 매장을 찾으면 그 좌표·장소 ID를 쓴다.
+  const KP_KEY = 'yds-kp1';
+  let kp = {};
+  try { kp = JSON.parse(localStorage.getItem(KP_KEY) || '{}') || {}; } catch { kp = {}; }
+  let kpTimer = null;
+  const kpSave = () => {
+    clearTimeout(kpTimer);
+    kpTimer = setTimeout(() => { try { localStorage.setItem(KP_KEY, JSON.stringify(kp)); } catch { /* 저장 불가면 무시 */ } }, 600);
+  };
+  let placesSvc = null;
+  const places = () => {
+    if (placesSvc) return placesSvc;
+    if (window.kakao && kakao.maps && kakao.maps.services) placesSvc = new kakao.maps.services.Places();
+    return placesSvc;
+  };
+  const normName = (t) => String(t || '').replace(/[\s()·.\-_/]/g, '').toLowerCase();
+  function nameScore(a, b) {
+    const x = normName(a), y = normName(b);
+    if (!x || !y) return 0;
+    if (x.includes(y) || y.includes(x)) return 3;
+    let k = 0;
+    for (let i = 0; i < y.length - 1; i++) if (x.includes(y.slice(i, i + 2))) k++;
+    return k >= Math.max(2, Math.ceil((y.length - 1) / 2)) ? 1 : 0;
+  }
+  function pickPlace(p, data) {
+    const core = /^(\S+)\s+(\d+(?:-\d+)?)/.exec(p.addr || '');
+    const addrRe = core ? new RegExp(`${core[1]}\\s*${core[2]}(?![\\d-])`) : null;
+    let best = null, bestScore = 0;
+    for (const d of data) {
+      const sim = nameScore(d.place_name, p.name);
+      if (!sim) continue;
+      const dist = Number(d.distance) || 0;
+      const sameAddr = !!(addrRe && addrRe.test(d.road_address_name || ''));
+      if (!sameAddr && dist > 120) continue;
+      const score = sim * 10 + (sameAddr ? 5 : 0) - dist / 100;
+      if (score > bestScore) { best = d; bestScore = score; }
+    }
+    return best;
+  }
+  function applyRefine(p, v) {
+    if (v) { p.lat = v[0]; p.lng = v[1]; p.kakaoId = v[2]; p.refined = true; } else { p.refined = false; }
+    const m = markers.get(p.id) || (extraPin && state.selected && state.selected.id === p.id ? extraPin : null);
+    if (m && v) m.move(ll(p));
+  }
+  function refine(p) {
+    if (p.refined !== undefined || !p.lat) return Promise.resolve(p);
+    if (kp[p.id] !== undefined) { applyRefine(p, kp[p.id]); return Promise.resolve(p); }
+    const svc = places();
+    if (!svc) return Promise.resolve(p);
+    return new Promise((resolve) => {
+      svc.keywordSearch(p.name, (data, status) => {
+        const S = kakao.maps.services.Status;
+        if (status === S.OK || status === S.ZERO_RESULT) {
+          const hit = status === S.OK ? pickPlace(p, data) : null;
+          const v = hit ? [Number(hit.y), Number(hit.x), hit.id] : 0;
+          kp[p.id] = v; kpSave(); applyRefine(p, v);
+        }
+        resolve(p);
+      }, { location: ll(p), radius: 300, size: 10 });
+    });
+  }
+  // 지도에 그려진 핀을 백그라운드에서 한두 개씩 보정한다 (요청이 몰리지 않게)
+  const refineQueue = [];
+  let refineRunning = false;
+  async function runRefineQueue() {
+    if (refineRunning) return;
+    refineRunning = true;
+    while (refineQueue.length) {
+      const p = refineQueue.shift();
+      if (p.refined !== undefined) continue;
+      try { await refine(p); } catch { /* 한 곳이 실패해도 다음으로 */ }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    refineRunning = false;
+  }
+  function queueRefine(items) {
+    for (const p of items) if (p.refined === undefined && !refineQueue.includes(p)) refineQueue.push(p);
+    runRefineQueue();
   }
 
   // 핀은 HTML 오버레이로 그린다. m = { overlay, pos, h, setMap }
@@ -250,7 +335,7 @@
       position: pos, content: node, map, zIndex: z,
       xAnchor: 0.5, yAnchor: tipY / h
     });
-    const m = { overlay, pos, h: tipY, setMap: (x) => overlay.setMap(x) };
+    const m = { overlay, pos, h: tipY, setMap: (x) => overlay.setMap(x), move(np) { this.pos = np; overlay.setPosition(np); } };
     node.addEventListener('mouseenter', () => showTip(m, label));
     node.addEventListener('mouseleave', () => tip.setMap(null));
     return { m, node };
@@ -275,6 +360,7 @@
     if (state.selected && !markers.has(state.selected.id) && state.selected.lat) {
       extraPin = addPin(state.selected, '★', state.selected.name, 2000).m;
     }
+    queueRefine(items);
     if (fit && items.length) {
       const b = new kakao.maps.LatLngBounds();
       items.slice(0, 40).forEach((p) => b.extend(ll(p)));
@@ -334,7 +420,10 @@
   // ---------- 맛집 카드 ----------
   const isDesktop = () => window.matchMedia('(min-width: 900px)').matches;
   const shareUrl = (p) => `${location.origin}/?p=${encodeURIComponent(p.id)}`;
-  const kakaoMapUrl = (p) => `https://map.kakao.com/link/search/${encodeURIComponent(p.name)}`;
+  // 카카오맵 길찾기(도착지 지정) 링크. 장소 ID가 있으면 그 매장으로, 없으면 이름+좌표로 정확히 찍는다.
+  const kakaoMapUrl = (p) => (p.kakaoId
+    ? `https://map.kakao.com/link/to/${p.kakaoId}`
+    : `https://map.kakao.com/link/to/${encodeURIComponent(p.name.replace(/[,]/g, ' '))},${p.lat},${p.lng}`);
 
   async function share(p, lead) {
     const url = shareUrl(p);
@@ -378,6 +467,14 @@
     );
   }
 
+  // 링크는 누르는 순간의 최신 좌표로 만든다 (보정이 끝났으면 보정된 값 사용)
+  function mapLink(p) {
+    const a = el('a', { class: 'btn-sub', href: kakaoMapUrl(p), target: '_blank', rel: 'noopener' }, '카카오맵에서 위치 · 길찾기');
+    a.addEventListener('click', () => { a.href = kakaoMapUrl(p); });
+    refine(p).then(() => { a.href = kakaoMapUrl(p); });
+    return a;
+  }
+
   function openCard(p, { fromShare = false } = {}) {
     const wasOpen = !!state.selected;
     state.selected = p;
@@ -395,7 +492,7 @@
       el('div', { class: 'actions' },
         eatLink(p),
         el('p', { class: 'note center' }, 'BC카드 잇플(eat.pl)에서 메뉴 · AI 후기 요약 · 지금 영업 중인지 볼 수 있어요'),
-        el('a', { class: 'btn-sub', href: kakaoMapUrl(p), target: '_blank', rel: 'noopener' }, '카카오맵에서 위치 · 길찾기'),
+        mapLink(p),
         el('button', { class: 'btn-sub', type: 'button', onclick: () => share(p) }, '단톡방에 "오늘 여기 어때?" 보내기')
       )
     ));
@@ -533,6 +630,7 @@
       for (const p of state.places) {
         p.customers = Array.isArray(p.customers) ? p.customers : [];
         p.groups = new Set(p.customers.map(groupOf).filter(Boolean));
+        if (kp[p.id]) applyRefine(p, kp[p.id]);
       }
       state.failed = !state.places.length;
     } catch {

@@ -74,6 +74,9 @@ docs/          기획·개발·디자인 문서
 - `renderMap(fit)`: 기존 핀을 지우고 다시 그림. `fit`이면 상위 40개로 `setBounds`, 레벨은 3보다 크게 유지.
 - `focusOnMap(p)`: 데스크톱에서 카드가 오른쪽을 가리므로 중심을 210px 보정한 **좌표 하나로 `panTo` 한 번만** 이동한다. (과거에 `setCenter` + `panBy`를 연달아 써서 튕기는 버그가 있었음 — 이동을 둘로 나누지 말 것)
 - 확대 단계: 카카오 레벨(작을수록 확대). 기본 4, 최대 축소 10. (네이버 zoom 15 ≈ 카카오 level 4~5)
+- **매장 좌표 보정**: 잇플 좌표는 주소 지점이라 큰 건물(IFC몰·파크원 등)에서 실제 매장과 최대 200m 넘게 어긋난다. `libraries=services`로 `kakao.maps.services.Places.keywordSearch`를 호출해 **같은 도로명 주소 + 비슷한 이름**인 매장을 찾으면 그 좌표와 장소 ID(`p.kakaoId`)로 바꾼다(`pickPlace`, `refine`). 이름이 다르면 매칭하지 않고 기존 좌표를 쓴다. 지도에 그려진 핀은 `queueRefine`이 백그라운드로 하나씩 처리하고, 결과는 `localStorage`(`yds-kp1`)에 캐시한다. 매칭 규칙을 바꾸면 캐시 키(`KP_KEY`)의 버전도 올린다.
+- **말풍선 클릭 통과**: 말풍선 오버레이의 바깥 래퍼에도 `pointer-events:none`을 줘야 한다(`showTip`). 안 그러면 호버 중인 핀을 덮어서 클릭이 간헐적으로 안 된다.
+- **길찾기 링크**: `kakaoMapUrl` — 장소 ID가 있으면 `https://map.kakao.com/link/to/{id}`, 없으면 `link/to/{이름},{위도},{경도}`. 이름 검색 링크(`link/search`)는 엉뚱한 매장이 나와서 쓰지 않는다.
 - 모바일(`IS_MOBILE`)은 스크롤 충돌을 피해 기본 드래그/줌을 꺼 두고, "지도 크게 보기"에서만 켠다.
 
 ## 6. 환경 설정 · 로컬 실행
@@ -121,6 +124,7 @@ curl -s -H "Referer: http://localhost:3000/" "https://dapi.kakao.com/v2/maps/sdk
 ## 10. 변경 이력 (최근)
 | 커밋 | 내용 |
 |---|---|
+| (이번) | 핀 클릭 통과 수정, 실제 매장 좌표 보정, 길찾기를 좌표/장소ID 링크로 |
 | c790bac | 핀 앵커 보정, 매장 선택 시 지도 이동 부드럽게 |
 | 56631ef | 지도를 카카오맵으로 교체 |
 | 0ffafdb | 메인화면 메뉴 생성 및 레이아웃 수정 |
