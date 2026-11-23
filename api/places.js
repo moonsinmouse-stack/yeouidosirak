@@ -23,13 +23,14 @@ const ROADS = [
 ];
 
 // 여의대로(여의도공원 동쪽 큰길)를 기준선으로 서/동을 나눈다. 좌표는 데이터의 TM128 값.
+// 더현대 서울·파크원·IFC는 따로 구분하지 않고 동여의도에 포함한다.
 const LINE_A = [304603, 547106]; // 여의대로 8
 const LINE_B = [305554, 547840]; // 여의대로 128
 const CENTER_PATTERNS = [/여의대로 108/, /국제금융로 10[^0-9]/, /국제금융로 10$/];
 
 function regionOf(item) {
   const addr = item.merAddr || '';
-  if (CENTER_PATTERNS.some((re) => re.test(addr))) return 'center';
+  if (CENTER_PATTERNS.some((re) => re.test(addr))) return 'dong';
   const x = Number(item.xaxsVal);
   const y = Number(item.yaxsVal);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return 'dong';
@@ -38,6 +39,21 @@ function regionOf(item) {
   const cross = dx * (y - LINE_A[1]) - dy * (x - LINE_A[0]);
   // 기준선에서 서쪽(공원·국회·KBS 쪽)으로 약 40m 이상이면 서여의도
   return cross > 40000 ? 'seo' : 'dong';
+}
+
+// 회식할 만한 곳인가? (잇플의 '직장인 방문' 표시는 카페·김밥집에도 붙어서 회식 기준으로 쓰지 않는다)
+// A: 고기·횟집·주점·치킨·족발 등 회식 업종 → 밤 8시 이후까지 영업하면 회식 적합
+// B: 한식·찌개·중식·일식·양식 등 일반 식당 → 밤 10시 이후까지(또는 직장인 방문 표시 + 밤 9시 이후)일 때만
+// 카페·분식·김밥·버거·도시락·푸드코트·샌드위치·빵·아이스크림과 패스트푸드·커피 브랜드는 제외
+const TEAM_A = /고기구이|곱창|횟집|해산물|족발|보쌈|호프|주점|이자카야|양꼬치|바\(bar\)|^바$|포차|전\/부침개|치킨|뷔페|샤브|오마카세/;
+const TEAM_B = /찜|탕|찌개|한정식|백반|기타한식|중식|일식|스시|초밥|이탈리아|외국식|아시안|멕시칸|피자|마라/;
+const TEAM_NO = /카페|분식|김밥|버거|도시락|푸드코트|샌드위치|토스트|빵|베이커리|도넛|아이스크림|빙수|브런치|돈가스|라멘|국수|떡볶이|죽/;
+const TEAM_NO_NAME = /커피|카페|coffee|cafe|판다익스프레스|맥도날드|버거킹|롯데리아|맘스터치|서브웨이|스타벅스|파파존스|도미노|피자헛|1달러/i;
+function isTeamSpot(name, cat, end, overnight, empy) {
+  if (!cat || TEAM_NO.test(cat) || TEAM_NO_NAME.test(name || '')) return false;
+  if (TEAM_A.test(cat)) return overnight || (end !== null && end >= 2000);
+  if (TEAM_B.test(cat)) return overnight || (end !== null && end >= 2200) || (empy && end !== null && end >= 2100);
+  return false;
 }
 
 function kindOf(cat) {
@@ -118,7 +134,8 @@ function normalize(i, name) {
     hours: s && e ? `${s} – ${overnight || e === '0:00' ? '익일 ' : ''}${e}` : null,
     lunch: start !== null && start <= 1130 && (overnight || (end !== null && end >= 1330)),
     late: overnight || (end !== null && end >= 2200),
-    team: !!i.empyVsitYn,
+    dinner: overnight || (end !== null && end >= 1900),
+    team: isTeamSpot(name, cat, end, overnight, !!i.empyVsitYn),
     foreign: !!i.frnrVsitYn,
     local: !!i.loclPrsnPpltYn,
     busyDay: i.congestionDwk || null,
