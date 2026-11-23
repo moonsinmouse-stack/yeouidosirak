@@ -22,9 +22,9 @@
   <main class="home" id="home">
     <header class="top">
       <a class="logo" href="/" aria-label="여의도시락 처음으로">
-        <svg class="dori" viewBox="0 0 64 64" aria-hidden="true"><use href="#dori"/></svg>
         <span>여의도시락</span>
       </a>
+      <img class="top-dori" src="/dori.png" alt="" width="180" height="162">
     </header>
 
     <div class="hero">
@@ -36,10 +36,6 @@
       <button class="sc" type="button" data-open-screen="explore">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5"/></svg>
         <b>맛집 탐색</b><small>조건으로 찾기</small>
-      </button>
-      <button class="sc" type="button" data-open-screen="map">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
-        <b>지도에서 보기</b><small>핀으로 한눈에</small>
       </button>
       <button class="sc" type="button" data-open-screen="pick">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l3 18M14 3l3 18"/></svg>
@@ -60,23 +56,16 @@
       <button class="map-toggle" type="button" id="map-toggle">지도 크게 보기</button>
     </section>
 
+    <div id="home-list">
     <div class="result-head">
       <h2 id="result-title">결과</h2>
       <span class="muted">지역 매출 상위 순</span>
     </div>
     <ol class="list" id="list" aria-live="polite"></ol>
     <button class="btn-more" type="button" id="more" hidden>더 보기</button>
+    </div>
 
-    <footer class="foot">
-      <p>eat.pl 잇플 · BC카드 결제 데이터 기반</p>
-      <p class="muted">순위는 최근 1개월 BC카드 결제 데이터 기준이며 실제 매출액은 공개되지 않아요. 영업 예상 시간은 결제 시각으로 추정한 값이라 공식 영업시간이 아니에요. 지도 위치는 대략적인 위치예요. 여의도시락은 BC카드·잇플의 공식 서비스가 아니에요.</p>
-    </footer>
-  </main>
-
-  <aside class="pane" id="pane" aria-label="맛집 카드" hidden></aside>
-</div>
-
-<div class="screen" id="screen-explore" role="dialog" aria-modal="true" aria-labelledby="t-explore" hidden>
+<div class="screen" id="screen-explore" role="region" aria-labelledby="t-explore" hidden>
   <div class="screen-inner">
     <div class="screen-top">
       <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
@@ -85,7 +74,7 @@
       <span class="spacer"></span>
     </div>
     <h2 id="t-explore" class="screen-title">맛집 탐색</h2>
-    <p class="screen-desc">지역, 메뉴 종류, 분위기, 주요 방문 고객층으로 여의도 맛집을 좁혀 봐요</p>
+    <p class="screen-desc">지역, 메뉴 종류, 상황, 주요 방문 고객층으로 여의도 맛집을 좁혀 봐요</p>
     <div class="screen-filters">
       <div class="f-label" id="xl-region">어디서?</div>
       <div class="regions small" role="group" aria-labelledby="xl-region" data-scope="explore" data-group="region"></div>
@@ -103,28 +92,7 @@
   </div>
 </div>
 
-<div class="screen" id="screen-map" role="dialog" aria-modal="true" aria-labelledby="t-map" hidden>
-  <div class="screen-inner">
-    <div class="screen-top">
-      <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <span class="spacer"></span>
-    </div>
-    <h2 id="t-map" class="screen-title">지도에서 보기</h2>
-    <p class="screen-desc">조건에 맞는 맛집을 지도 위 핀으로 한눈에 봐요. 핀을 누르면 가게 카드가 열려요</p>
-    <div class="screen-filters">
-      <div class="f-label" id="ml-region">어디서?</div>
-      <div class="regions small" role="group" aria-labelledby="ml-region" data-scope="map" data-group="region"></div>
-      <div class="f-label" id="ml-kind">뭐 먹지?</div>
-      <div class="chips small" role="group" aria-labelledby="ml-kind" data-scope="map" data-group="kind"></div>
-    </div>
-    <div class="map-slot" id="map-slot"></div>
-    <footer class="screen-foot">eat.pl 잇플 · BC카드 결제 데이터 기준 · 핀 번호는 지역 매출 상위 순 · 위치는 대략적이에요</footer>
-  </div>
-</div>
-
-<div class="screen pick" id="screen-pick" role="dialog" aria-modal="true" aria-labelledby="t-pick" hidden>
+<div class="screen pick" id="screen-pick" role="region" aria-labelledby="t-pick" hidden>
   <div class="screen-inner">
     <div class="screen-top">
       <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
@@ -139,25 +107,14 @@
       <div class="regions small" role="group" aria-labelledby="plbl-region" data-scope="pick" data-group="region"></div>
       <div class="f-label" id="plbl-kind">뭐 먹지?</div>
       <div class="chips small" role="group" aria-labelledby="plbl-kind" data-scope="pick" data-group="kind"></div>
-      <div class="f-label" id="plbl-mood">어떤 자리?</div>
-      <div class="chips small" role="group" aria-labelledby="plbl-mood" data-scope="pick" data-group="mood"></div>
-      <div class="f-label" id="plbl-top">몇 곳 중에서?</div>
-      <div class="chips small" role="group" aria-labelledby="plbl-top" data-scope="pick" data-group="top"></div>
     </div>
 
     <div class="pick-stage">
       <div class="cup" id="cup" aria-hidden="true">
-        <svg viewBox="0 0 240 270">
-          <rect x="78" y="40" width="10" height="130" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(-10 83 170)"/>
-          <rect x="100" y="30" width="10" height="140" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(-4 105 170)"/>
-          <rect x="130" y="30" width="10" height="140" rx="4" fill="#C98B5A" stroke="#3A2E1F" stroke-width="2" transform="rotate(4 135 170)"/>
-          <rect x="152" y="40" width="10" height="130" rx="4" fill="#E0A877" stroke="#3A2E1F" stroke-width="2" transform="rotate(10 157 170)"/>
-          <rect class="lucky" x="114" y="20" width="12" height="150" rx="5" fill="#FF8A7A" stroke="#3A2E1F" stroke-width="2.5"/>
-          <path d="M50 130 H190 L176 250 Q174 262 162 262 H78 Q66 262 64 250 Z" fill="#8FD9C9" stroke="#3A2E1F" stroke-width="3" stroke-linejoin="round"/>
-          <path d="M44 122 H196 Q202 122 202 128 V136 Q202 142 196 142 H44 Q38 142 38 136 V128 Q38 122 44 122 Z" fill="#fff" stroke="#3A2E1F" stroke-width="3"/>
-          <circle cx="102" cy="190" r="5" fill="#3A2E1F"/><circle cx="138" cy="190" r="5" fill="#3A2E1F"/>
-          <ellipse cx="90" cy="204" rx="8" ry="5" fill="#FF8A7A"/><ellipse cx="150" cy="204" rx="8" ry="5" fill="#FF8A7A"/>
-          <path d="M112 206 Q120 214 128 206" stroke="#3A2E1F" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <svg viewBox="0 0 300 270">
+          <defs><clipPath id="cup-mouth"><rect x="0" y="0" width="300" height="192"/></clipPath></defs>
+          <image href="/dori-pick.png" x="15" y="39" width="270" height="231"/>
+          <g clip-path="url(#cup-mouth)"><g transform="rotate(4 60 224)"><rect class="lucky" x="55.5" y="124" width="9" height="100" rx="4.5" fill="#FF8A7A" stroke="#3A2E1F" stroke-width="2.4"/></g></g>
         </svg>
       </div>
       <p class="pick-scope" id="pick-scope" aria-live="polite"></p>
@@ -168,7 +125,7 @@
   </div>
 </div>
 
-<div class="screen" id="screen-top30" role="dialog" aria-modal="true" aria-labelledby="t-top30" hidden>
+<div class="screen" id="screen-top30" role="region" aria-labelledby="t-top30" hidden>
   <div class="screen-inner">
     <div class="screen-top">
       <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
@@ -190,7 +147,7 @@
   </div>
 </div>
 
-<div class="screen" id="screen-local" role="dialog" aria-modal="true" aria-labelledby="t-local" hidden>
+<div class="screen" id="screen-local" role="region" aria-labelledby="t-local" hidden>
   <div class="screen-inner">
     <div class="screen-top">
       <button class="icon-btn" type="button" data-close-screen aria-label="닫기">
@@ -211,19 +168,17 @@
   </div>
 </div>
 
+    <footer class="foot">
+      <p>eat.pl 잇플 · BC카드 결제 데이터 기반</p>
+      <p class="muted">순위는 최근 1개월 BC카드 결제 데이터 기준이며 실제 매출액은 공개되지 않아요. 영업 예상 시간은 결제 시각으로 추정한 값이라 공식 영업시간이 아니에요. 지도 위치는 대략적인 위치예요. 여의도시락은 BC카드·잇플의 공식 서비스가 아니에요.</p>
+    </footer>
+  </main>
+
+  <aside class="pane" id="pane" aria-label="맛집 카드" hidden></aside>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <g id="dori">
-      <path d="M10 44 C4 34 10 22 22 16 C34 10 46 6 54 12 C62 18 58 30 50 38 C42 48 30 56 20 56 C14 56 12 50 10 44 Z" fill="#FFD45C" stroke="#3A2E1F" stroke-width="2.5"/>
-      <circle cx="26" cy="30" r="3" fill="#3A2E1F"/><circle cx="40" cy="26" r="3" fill="#3A2E1F"/>
-      <ellipse cx="21" cy="37" rx="4" ry="2.5" fill="#FF8A7A"/><ellipse cx="45" cy="33" rx="4" ry="2.5" fill="#FF8A7A"/>
-      <path d="M30 36 Q33 39 36 35" stroke="#3A2E1F" stroke-width="2" fill="none" stroke-linecap="round"/>
-      <path d="M31 44 L35 42 L37 50 L33 53 L30 50 Z" fill="#8FD9C9" stroke="#3A2E1F" stroke-width="1.8" stroke-linejoin="round"/>
-    </g>
-  </defs>
-</svg>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=7642f501bad35eddb810bf1ca103519e&libraries=services"></script>
 <script src="/app.js" defer></script>
 </body>

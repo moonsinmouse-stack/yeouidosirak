@@ -4,8 +4,7 @@
   const REGIONS = [
     { id: 'all', label: '전체', sub: '여의도 전체' },
     { id: 'seo', label: '서여의도', sub: '국회·KBS 쪽' },
-    { id: 'center', label: '더현대·IFC', sub: '파크원 포함' },
-    { id: 'dong', label: '동여의도', sub: '증권가·63 쪽' }
+    { id: 'dong', label: '동여의도', sub: '증권가·IFC·더현대 쪽' }
   ];
   const KINDS = [
     { id: 'all', label: '전부' },
@@ -13,17 +12,12 @@
     { id: 'cafe', label: '카페·디저트' },
     { id: 'bar', label: '술집' }
   ];
-  const MOODS = [
+  // 맛집 탐색의 '어떤 자리?' 항목
+  const MOODS_EXPLORE = [
     { id: 'lunch', label: '점심' },
     { id: 'team', label: '회식' },
     { id: 'late', label: '늦게까지' },
-    { id: 'foreign', label: '외국인 많은' },
-    { id: 'local', label: '동네 사람 맛집' }
-  ];
-  const TOPS = [
-    { id: 10, label: '상위 10곳' },
-    { id: 30, label: '상위 30곳' },
-    { id: 0, label: '조건에 맞는 전부' }
+    { id: 'foreign', label: '외국인 손님' }
   ];
   // 잇플 '주요 방문 고객층'(예: 30대남성, 60대이상여성)을 연령대 + 성별 6개로 묶는다.
   const GROUPS = [
@@ -44,22 +38,21 @@
     if (age >= 20) return `${sex}2030`;
     return null;
   }
-  const REGION_NAME = { seo: '서여의도', center: '더현대·IFC', dong: '동여의도' };
+  const REGION_NAME = { seo: '서여의도', dong: '동여의도' };
   const PAGE = 20;
   const MAP_MAX = 150;
   const YEOUIDO = [37.5238, 126.9265];
 
-  const state = { places: [], loaded: false, failed: false, selected: null, lastPick: null };
+  const state = { places: [], loaded: false, failed: false, selected: null, lastPick: null, picked: null };
 
   // 홈은 조건 없이 전체를 보여 주고, 바로가기 화면마다 자기 조건을 따로 가진다.
   const newFilter = (o = {}) => ({ region: 'all', kind: 'all', moods: new Set(), groups: new Set(), local: false, ...o });
   const HOME = newFilter();
   const F = {
     explore: newFilter(),
-    map: newFilter(),
     top30: newFilter(),
     local: newFilter({ local: true }),
-    pick: newFilter({ kind: 'meal', moods: new Set(['lunch']), top: 30 }) // 기존 제비뽑기 기본 조건 유지
+    pick: newFilter({ kind: 'meal' }) // 제비뽑기는 지역·종류에 맞는 전체에서 뽑는다
   };
   const SHOWN = { home: PAGE, explore: PAGE, local: PAGE };
   const TOP_N = 30;
@@ -79,12 +72,6 @@
     return n;
   };
   const NS = 'http://www.w3.org/2000/svg';
-  const svgUse = (cls) => {
-    const s = document.createElementNS(NS, 'svg');
-    s.setAttribute('viewBox', '0 0 64 64'); s.setAttribute('class', cls); s.setAttribute('aria-hidden', 'true');
-    const u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#dori'); s.append(u);
-    return s;
-  };
   const icon = (d) => {
     const s = document.createElementNS(NS, 'svg');
     s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true');
@@ -109,7 +96,7 @@
     const t = [el('span', { class: 'tag' }, p.cat || '음식점')];
     if (p.team) t.push(el('span', { class: 'tag mint' }, '회식 적합'));
     if (p.local) t.push(el('span', { class: 'tag mint' }, '동네 사람 맛집'));
-    if (p.foreign) t.push(el('span', { class: 'tag coral' }, '외국인 많음'));
+    if (p.foreign) t.push(el('span', { class: 'tag coral' }, '외국인 손님'));
     if (p.busyTime) t.push(el('span', { class: 'tag coral' }, `${p.busyTime} 붐빔`));
     return t;
   }
@@ -134,13 +121,10 @@
           box.replaceChildren(...KINDS.map((k) => chip(k.label, f.kind === k.id, single('kind', k.id))));
           break;
         case 'mood':
-          box.replaceChildren(...MOODS.map((m) => chip(m.label, f.moods.has(m.id), multi(f.moods, m.id))));
+          box.replaceChildren(...MOODS_EXPLORE.map((m) => chip(m.label, f.moods.has(m.id), multi(f.moods, m.id))));
           break;
         case 'cust':
           box.replaceChildren(...GROUPS.map((g) => chip(g.label, f.groups.has(g.id), multi(f.groups, g.id))));
-          break;
-        case 'top':
-          box.replaceChildren(...TOPS.map((t) => chip(t.label, f.top === t.id, single('top', t.id))));
           break;
       }
     }
@@ -206,8 +190,13 @@
   const ll = (p) => new kakao.maps.LatLng(p.lat, p.lng);
   const htmlEl = (html) => { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; };
 
-  // 지도 화면이 열려 있으면 그 화면의 조건, 아니면 홈(전체)
-  const mapFilter = () => (openScreenId === 'map' ? F.map : HOME);
+  // 지도는 항상 오른쪽(모바일은 위)에 그대로 두고, 열려 있는 메뉴의 조건을 따라 핀을 바꾼다. 메뉴가 없으면 전체.
+  function mapItems() {
+    const id = openScreenId;
+    let items = filtered(id ? F[id] : HOME);
+    if (id === 'top30') items = items.slice(0, TOP_N);
+    return items.filter((p) => p.lat && p.lng).slice(0, MAP_MAX);
+  }
 
   function initMap() {
     if (map) return;
@@ -277,7 +266,7 @@
   }
   function applyRefine(p, v) {
     if (v) { p.lat = v[0]; p.lng = v[1]; p.kakaoId = v[2]; p.refined = true; } else { p.refined = false; }
-    const m = markers.get(p.id) || (extraPin && state.selected && state.selected.id === p.id ? extraPin : null);
+    const m = markers.get(p.id) || (extraPin && [state.selected, state.picked].some((q) => q && q.id === p.id) ? extraPin : null);
     if (m && v) m.move(ll(p));
   }
   function refine(p) {
@@ -318,7 +307,7 @@
 
   // 핀은 HTML 오버레이로 그린다. m = { overlay, pos, h, setMap }
   function addPin(p, rank, label, z) {
-    const sel = state.selected && state.selected.id === p.id;
+    const sel = [state.selected, state.picked].some((q) => q && q.id === p.id);
     const big = rank <= 10 || sel || rank === '★';
     // 핀 끝(회전한 네모의 모서리)이 좌표에 정확히 닿도록 크기별로 앵커를 잡는다
     // 끝 y = 핀 중심 y + 반대각선(변×0.707) − 둥근 모서리(4px) 깎임 ≈ 1.66
@@ -348,7 +337,7 @@
     if (extraPin) { extraPin.setMap(null); extraPin = null; }
     tip.setMap(null);
     if (!state.loaded || state.failed) return;
-    const items = filtered(mapFilter()).filter((p) => p.lat && p.lng).slice(0, MAP_MAX);
+    const items = mapItems();
     // 순위가 낮은 것부터 그려서 상위 핀이 위에 오게
     for (let i = items.length - 1; i >= 0; i--) {
       const p = items[i];
@@ -357,9 +346,9 @@
       node.addEventListener('click', () => openCard(p));
       markers.set(p.id, m);
     }
-    if (state.selected && !markers.has(state.selected.id) && state.selected.lat) {
-      extraPin = addPin(state.selected, '★', state.selected.name, 2000).m;
-    }
+    // 상위 150개에 못 든 선택/뽑힌 집도 지도에 별 핀으로 보여 준다
+    const extra = [state.picked, state.selected].find((q) => q && q.lat && !markers.has(q.id));
+    if (extra) extraPin = addPin(extra, '★', extra.name, 2000).m;
     queueRefine(items);
     if (fit && items.length) {
       const b = new kakao.maps.LatLngBounds();
@@ -370,14 +359,14 @@
   }
   let extraPin = null;
 
-  function focusOnMap(p) {
+  function focusOnMap(p, { card = true } = {}) {
     if (!map || !p.lat) return;
     renderMap(false);
     if (map.getLevel() > 4) map.setLevel(4);
     // 데스크톱은 카드가 지도 오른쪽을 가리므로 핀이 카드 왼쪽에 보이게 중심을 옮긴다.
     // 순간이동 없이 최종 중심점 하나로 부드럽게 한 번만 이동한다.
     let target = ll(p);
-    if (isDesktop()) {
+    if (card && isDesktop()) {
       const proj = map.getProjection();
       const box = $('#map').getBoundingClientRect();
       const c = proj.coordsFromContainerPoint(new kakao.maps.Point(box.width / 2, box.height / 2));
@@ -402,18 +391,8 @@
     }
   }
 
-  // 지도 화면에서는 같은 지도를 화면 안으로 옮겨 쓴다 (지도 인스턴스는 하나)
   // 컨테이너 크기가 바뀐 뒤에 크기를 다시 재고 핀 범위를 맞춘다
   const refitMap = () => { if (map) setTimeout(() => { resizeMap(); renderMap(true); }, 80); };
-  function attachMap() {
-    if (mapBig) toggleMapBig(false);
-    $('#map-slot').append($('#map'));
-    refitMap();
-  }
-  function detachMap() {
-    $('#map-wrap').prepend($('#map'));
-    refitMap();
-  }
 
   function update() { renderFilters(); renderLists(); renderMap(true); renderPickScope(); }
 
@@ -487,7 +466,7 @@
         el('span', { class: 'jua' }, fromShare ? '친구가 보낸 도시락' : '도시락 뚜껑 열기'),
         el('button', { class: 'icon-btn', type: 'button', 'aria-label': '공유하기', onclick: () => share(p) }, icon('M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13'))
       ),
-      el('div', { class: 'lid' }, svgUse('dori')),
+      el('div', { class: 'lid' }),
       cardBody(p),
       el('div', { class: 'actions' },
         eatLink(p),
@@ -525,33 +504,42 @@
   });
 
   // ---------- 바로가기 화면 ----------
+  // 메뉴 화면은 홈의 목록 자리에 들어간다 (지도는 그대로). 다른 메뉴를 누르면 그 자리에서 바뀐다.
+  const markShortcuts = () => $$('[data-open-screen]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.openScreen === openScreenId)));
+
   function openScreen(id) {
-    if (openScreenId) return;
+    if (openScreenId === id) return;
+    const switching = !!openScreenId;
+    if (switching) hideScreen(true);
     openScreenId = id;
     const s = $(`#screen-${id}`);
-    s.hidden = false; s.scrollTop = 0;
-    document.body.style.overflow = 'hidden';
-    if (id === 'map') attachMap();
+    s.hidden = false;
+    $('#home-list').hidden = true;
     if (id === 'pick') resetPick();
+    markShortcuts();
     update();
-    history.pushState({ screen: id }, '', location.search || location.pathname);
-    s.querySelector('[data-close-screen]').focus();
+    const hs = { screen: id };
+    if (switching) history.replaceState(hs, '', location.search || location.pathname);
+    else history.pushState(hs, '', location.search || location.pathname);
+    s.querySelector('[data-close-screen]').focus({ preventScroll: true });
+    // 모바일은 지도가 위에 보이도록, 데스크톱은 메뉴 화면 맨 위로
+    (isDesktop() ? s : $('#map-wrap')).scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function hideScreen() {
+  function hideScreen(switching = false) {
     if (!openScreenId) return;
-    const id = openScreenId;
+    $(`#screen-${openScreenId}`).hidden = true;
     openScreenId = null;
-    $(`#screen-${id}`).hidden = true;
-    if (id === 'map') detachMap();
-    if ($('#pane').hidden || isDesktop()) document.body.style.overflow = '';
-    if (id !== 'map') renderMap(true);
+    if (switching) return;
+    $('#home-list').hidden = false;
+    state.picked = null;
+    markShortcuts();
+    update();
   }
 
   // ---------- 조건 제비뽑기 ----------
   function pool() {
-    const items = filtered(F.pick);
-    return F.pick.top ? items.slice(0, F.pick.top) : items;
+    return filtered(F.pick);
   }
 
   function renderPickScope() {
@@ -561,9 +549,8 @@
     const btn = $('#draw');
     if (!state.loaded) { scope.textContent = '맛집 정보를 불러오는 중이에요'; btn.disabled = true; return; }
     if (!n) { scope.textContent = '이 조건에 맞는 집이 없어요. 조건을 하나 빼 보세요.'; btn.disabled = true; return; }
-    const moods = MOODS.filter((m) => F.pick.moods.has(m.id)).map((m) => m.label);
     const kind = KINDS.find((k) => k.id === F.pick.kind);
-    const parts = [regionLabel(F.pick), F.pick.kind === 'all' ? null : kind.label, ...moods].filter(Boolean).join(' · ');
+    const parts = [regionLabel(F.pick), F.pick.kind === 'all' ? null : kind.label].filter(Boolean).join(' · ');
     scope.replaceChildren(el('b', {}, `${n}곳`), ` 중에서 뽑아요 (${parts})`);
     btn.disabled = false;
   }
@@ -571,7 +558,19 @@
   function resetPick() {
     $('#pick-result').replaceChildren();
     $('#cup').classList.remove('picked');
+    clearPicked();
     $('#draw').textContent = '젓가락 뽑기!';
+  }
+
+  // 뽑힌 집은 지도에 바로 크게 표시하고 그 위치로 이동한다 (카드는 열지 않는다)
+  function clearPicked() {
+    if (!state.picked) return;
+    state.picked = null;
+    renderMap(false);
+  }
+  function showPickedOnMap(p) {
+    state.picked = p;
+    focusOnMap(p, { card: false });
   }
 
   function draw() {
@@ -580,18 +579,19 @@
     let p = items[Math.floor(Math.random() * items.length)];
     if (items.length > 1 && state.lastPick && p.id === state.lastPick.id) p = items[(items.indexOf(p) + 1) % items.length];
     state.lastPick = p;
+    clearPicked();
     const cup = $('#cup');
     cup.classList.remove('picked', 'shake'); void cup.offsetWidth; cup.classList.add('shake');
     setTimeout(() => {
       cup.classList.remove('shake'); cup.classList.add('picked');
+      showPickedOnMap(p);
       $('#pick-result').replaceChildren(el('div', { class: 'result-card' },
         el('div', { class: 'r-meta' }, '오늘의 여의도시락은'),
         el('div', { class: 'r-name' }, p.name),
         el('div', { class: 'r-meta' }, `${p.cat} · ${REGION_NAME[p.region] || '여의도'} · 지역 매출 상위 ${pct(p.loc)}`),
         el('div', { class: 'r-actions' },
           eatLink(p, '메뉴 · 후기 보기'),
-          el('button', { class: 'btn-sub', type: 'button', onclick: () => share(p, '제비뽑기 결과 나왔다!') }, '단톡방에 보내기'),
-          el('button', { class: 'btn-sub', type: 'button', onclick: () => { history.back(); setTimeout(() => openCard(p), 300); } }, '카드 · 지도 보기')
+          el('button', { class: 'btn-sub', type: 'button', onclick: () => share(p, '제비뽑기 결과 나왔다!') }, '단톡방에 보내기')
         )
       ));
       $('#draw').textContent = '다시 뽑기';
@@ -606,7 +606,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
   }
 
-  $$('[data-open-screen]').forEach((b) => b.addEventListener('click', () => openScreen(b.dataset.openScreen)));
+  $$('[data-open-screen]').forEach((b) => b.addEventListener('click', () => (openScreenId === b.dataset.openScreen ? history.back() : openScreen(b.dataset.openScreen))));
   $$('[data-close-screen]').forEach((b) => b.addEventListener('click', () => history.back()));
   $('#draw').addEventListener('click', draw);
   for (const cfg of LISTS) {

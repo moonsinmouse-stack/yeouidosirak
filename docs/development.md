@@ -8,7 +8,7 @@
 - Node ≥ 18, ES Modules (`package.json`의 `"type": "module"`). 의존성은 `proj4` 하나(좌표 변환).
 
 ```
-index.html     화면 뼈대(홈 + 5개 풀스크린 화면 + 카드 패널), 카카오 SDK 스크립트
+index.html     화면 뼈대(홈 + 메뉴 4개(explore·pick·top30·local, 홈 목록 자리에 표시) + 카드 패널), 카카오 SDK 스크립트
 style.css      전체 스타일 (디자인 토큰은 :root)
 app.js         화면 로직 전체 (하나의 IIFE)
 api/places.js  Vercel 함수: 잇플 데이터 수집·정리 → /api/places
@@ -34,11 +34,11 @@ docs/          기획·개발·디자인 문서
 | `id` | 잇플 URL 마지막 조각 (공유 링크 `?p=`에 사용) |
 | `name`, `addr`, `cat` | 정리된 가게명 / 주소(서울 영등포구 제거) / 업종 |
 | `kind` | `meal` · `cafe` · `bar` (`kindOf`) |
-| `region` | `seo` · `center` · `dong` (`regionOf`) |
+| `region` | `seo` · `dong` (`regionOf`). 더현대·IFC·파크원은 `dong` |
 | `lat`, `lng` | WGS84 위경도 |
 | `nat`, `loc` | 전국 / 지역 매출 상위 % (낮을수록 상위) |
 | `hours` | "10:30 – 21:30" 추정. 익일이면 "익일 " 접두 |
-| `lunch`, `late`, `team`, `foreign`, `local` | 분위기 플래그 |
+| `lunch`, `late`, `team`, `foreign`, `local` | 분위기 플래그. `team`은 `isTeamSpot`(업종 + 영업 종료 시각)으로 계산 — 잇플 `empyVsitYn`은 회식과 무관해서 보조로만 쓴다 |
 | `busyDay`, `busyTime` | 붐비는 요일/시간대 |
 | `customers[]` | 주요 방문 고객층 원문 (프론트에서 `groupOf`로 6그룹화) |
 
@@ -46,7 +46,7 @@ docs/          기획·개발·디자인 문서
 잇플 좌표는 TM128/KATEC → `proj4`로 WGS84 변환 (`toLatLng`). **카카오 지오코더와 비교해 대부분 0m 오차로 검증됨.** 핀 위치가 어긋나 보이면 데이터보다 핀 앵커(아래 5번)를 먼저 의심한다.
 
 ### 서여의도/동여의도 구분
-여의대로 기준선(`LINE_A`~`LINE_B`) 서쪽 약 40m 이상이면 서여의도. 더현대·IFC·파크원은 주소 패턴(`CENTER_PATTERNS`)으로 먼저 분리.
+여의대로 기준선(`LINE_A`~`LINE_B`) 서쪽 약 40m 이상이면 서여의도. 더현대·IFC·파크원은 주소 패턴(`CENTER_PATTERNS`)으로 먼저 잡아 동여의도로 넣는다.
 
 ## 4. 프론트 구조 (`app.js`)
 | 구역 | 내용 |
@@ -57,8 +57,8 @@ docs/          기획·개발·디자인 문서
 | 목록 | `LISTS` 설정 배열 + `renderList` |
 | 지도 | 아래 5번 |
 | 카드 | `openCard` / `closeCard` / `cardBody` (데스크톱: 우측 패널, 모바일: 전체 + `history.pushState`) |
-| 화면 전환 | `openScreen` / 닫기. `data-open-screen`, `data-close-screen` 속성 |
-| 제비뽑기 | `resetPick` 등 |
+| 화면 전환 | `openScreen` / `hideScreen`. 메뉴 화면(`#screen-*`)은 홈의 `#home-list` 자리에 들어가고 지도는 그대로 둔다. 다른 메뉴를 누르면 그 자리에서 바뀌고, 같은 메뉴를 다시 누르면 닫힌다(`history.back`). 지도 핀은 `mapItems()`가 열린 메뉴의 조건으로 고른다 |
+| 제비뽑기 | `resetPick` 등. 조건은 지역·종류뿐이고 후보는 `filtered(F.pick)` 전체. 뽑힌 집은 `state.picked` → `showPickedOnMap`으로 지도에 별 핀 + 이동(카드는 열지 않음) |
 | 진입 | `load()` → `initMap()` → `/api/places` → `update()` → `refitMap()` |
 
 규칙: 화면별 필터는 서로 독립이다. 새 화면을 추가하면 `F`에 항목, `LISTS`에 목록, `index.html`에 `#screen-*`, 홈 `.sc` 버튼을 함께 추가한다.
