@@ -8,6 +8,14 @@ BC카드 eat.pl 잇플 데이터(k-skill `bccard-eatpl-search` 스킬)로 여의
 - `api/places.js` — Vercel 서버 함수. k-skill 프록시를 여의도 도로명별로 호출해 합치고 서여의도 / 더현대·IFC / 동여의도로 분류
 - 맛집 카드의 "eat.pl에서 자세히 보기" 링크가 잇플로 보내는 핵심 동선 (referrer 유지)
 
+## 내 컴퓨터에서 보기
+Node.js 18 이상이 필요합니다.
+```bash
+npm install
+npm start
+```
+브라우저에서 http://localhost:3000 을 엽니다. 포트를 바꾸려면 `PORT=4000 npm start`.
+
 ## 배포 (Vercel)
 1. vercel.com 에 GitHub 로 로그인 → Add New → Project → `yeouidosirak` Import
 2. Framework Preset: **Other**, 그대로 Deploy
